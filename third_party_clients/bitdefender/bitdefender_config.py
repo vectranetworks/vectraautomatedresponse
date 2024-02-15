@@ -1,0 +1,4 @@
+HOSTNAME = "10.10.10.10"
+CHECK_SSL = False
+API_KEY = "<api-key>"
+BLOCK_MULTIPLE = False
