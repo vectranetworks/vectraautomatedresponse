@@ -34,6 +34,7 @@ from config import (
     BLOCK_START_TIME,
     COGNITO_TOKEN,
     COGNITO_URL,
+    CLIENT_ID,
     DST_EMAIL,
     EXTERNAL_BLOCK_DETECTION_TAG,
     EXTERNAL_BLOCK_DETECTION_TYPES,
@@ -42,6 +43,7 @@ from config import (
     LOG_TO_FILE,
     NO_BLOCK_ACCOUNT_GROUP_NAME,
     NO_BLOCK_HOST_GROUP_NAME,
+    SECRET_KEY,
     SEND_EMAIL,
     SEND_SYSLOG,
     SLEEP_MINUTES,
@@ -56,6 +58,7 @@ from config import (
     SYSLOG_PROTO,
     SYSLOG_SERVER,
     THIRD_PARTY_CLIENTS,
+    V3,
 )
 from vectra_automated_response_consts import (
     VectraAccount,
@@ -75,7 +78,6 @@ for client in os.listdir("third_party_clients"):
         "README.md",
         "third_party_interface.py",
     ]:
-        #alt_client = [x for x in os.listdir(f"third_party_clients/{client}") if not re.search("_config|__|READ|\.[D|t]", x)][0].split(".")[0]
         tpc = [x for x in os.listdir(f"third_party_clients/{client}") if not re.search("_config|__|READ|\.[D|t]", x)]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -103,22 +105,29 @@ HostDict = Dict[str, VectraHost]
 AccountDict = Dict[str, VectraAccount]
 DetectionDict = Dict[str, VectraDetection]
 
-
-if LOG_TO_FILE:
-    logging.basicConfig(
-        filename=LOG_FILE,
-        format="%(asctime)s: %(message)s",
-        encoding="utf-8",
-        level=logging.DEBUG,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-else:
-    logging.basicConfig(
-        format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
-        encoding="utf-8",
-        level=logging.INFO,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+def log_conf(debug):
+    if LOG_TO_FILE:
+        logging.basicConfig(
+            filename=LOG_FILE,
+            format="%(asctime)s: %(message)s",
+            encoding="utf-8",
+            level=logging.DEBUG,
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    elif debug:
+        logging.basicConfig(
+            format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
+            encoding="utf-8",
+            level=logging.DEBUG,
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    else:
+        logging.basicConfig(
+            format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
+            encoding="utf-8",
+            level=logging.INFO,
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
 
 class HTTPException(Exception):
@@ -148,10 +157,13 @@ class HTTPException(Exception):
 
 
 class VectraClient(vectra.VectraClientV2_4):
+# class VectraClient(vectra.VectraSaaSClientV3_3):
     def __init__(
         self,
         url: Optional[str] = None,
         token: Optional[str] = None,
+        #client_id: Optional[str] = None,
+        #secret_key: Optional[str] = None,
         verify: bool = False,
     ) -> None:
         """
@@ -161,6 +173,7 @@ class VectraClient(vectra.VectraClientV2_4):
         :param token: API token for authentication - required
         :param verify: verify SSL - optional
         """
+        # super().__init__(url=url, token=token, client_id=client_id, secret_key=secret_key, verify=verify)
         super().__init__(url=url, token=token, verify=verify)
         self.logger = logging.getLogger("VectraClient")
 
@@ -793,7 +806,7 @@ class VectraAutomatedResponse(object):
                 result_dict[key] = value
         return result_dict
 
-    def get_hosts_to_block_unblock(self, groom=False, alert=False):
+    def get_hosts_to_block_unblock(self, groom=False):
         """
         Get all host IDs matching the criteria to be blocked or unblocked
         :rtype: list
@@ -811,14 +824,17 @@ class VectraAutomatedResponse(object):
             block_host_detections_types_min_host_tc=self.block_host_detections_types_min_host_tc,
         )
         # Get a dict of hosts already blocked
-        blocked_hosts = self.vectra_api_client.get_tagged_hosts(tag="VAR Blocked")
+        blocked_hosts = self.vectra_api_client.get_tagged_hosts(tag="VAR Host Blocked")
 
         message = "Found {} already blocked hosts on Vectra".format(
             str(len(blocked_hosts.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+
+        if len(blocked_hosts.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Find blocked hosts that should be unblocked
         hosts_wrongly_blocked = self._get_dict_keys_intersect(
@@ -830,9 +846,12 @@ class VectraAutomatedResponse(object):
                 str(len(hosts_wrongly_blocked.keys()))
             )
         )
-
-        self.logger.info(message)
-        self.info_msg.append(message)
+        
+        self.logger.debug(message)
+        
+        if len(hosts_wrongly_blocked.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute hosts that should be blocked
         hosts_to_block = self._get_dict_keys_relative_complement(
@@ -847,8 +866,11 @@ class VectraAutomatedResponse(object):
             str(len(hosts_to_block.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+
+        if len(hosts_to_block.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute hosts that should be unblocked
         hosts_to_unblock = self._get_dict_keys_relative_complement(
@@ -861,8 +883,11 @@ class VectraAutomatedResponse(object):
             str(len(hosts_to_unblock.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(hosts_to_unblock.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         hosts_to_groom = {}
         if groom:
@@ -875,17 +900,20 @@ class VectraAutomatedResponse(object):
                 len(hosts_to_groom.keys())
             )
 
-            self.logger.info(message)
-            self.info_msg.append(message)
+            self.logger.debug(message)
+            
+            if len(hosts_to_groom.keys()) > 0:
+                self.logger.info(message)
+                self.info_msg.append(message)
 
-            message = "Hosts to groom: {}".format(hosts_to_groom.keys())
+                message = "Hosts to groom: {}".format(hosts_to_groom.keys())
 
-            self.logger.info(message)
-            self.info_msg.append(message)
+                self.logger.info(message)
+                self.info_msg.append(message)
 
         return hosts_to_block, hosts_to_unblock, hosts_to_groom
 
-    def get_accounts_to_block_unblock(self, alert=False):
+    def get_accounts_to_block_unblock(self):
         """
         Get all account IDs matching the criteria to be blocked or unblocked
         :rtype: list
@@ -903,14 +931,17 @@ class VectraAutomatedResponse(object):
             block_account_detections_types_min_account_tc=self.block_account_detections_types_min_account_tc,
         )
         # Get a dict of accounts already blocked
-        blocked_accounts = self.vectra_api_client.get_tagged_accounts(tag="VAR Blocked")
+        blocked_accounts = self.vectra_api_client.get_tagged_accounts(tag="VAR Account Blocked")
 
         message = "Found {} already blocked accounts on Vectra".format(
             str(len(blocked_accounts.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(blocked_accounts.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Find blocked account that should be unblocked
         accounts_wrongly_blocked = self._get_dict_keys_intersect(
@@ -923,8 +954,11 @@ class VectraAutomatedResponse(object):
             )
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(accounts_wrongly_blocked.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute accounts that should be blocked
         accounts_to_block = self._get_dict_keys_relative_complement(
@@ -939,8 +973,11 @@ class VectraAutomatedResponse(object):
             str(len(accounts_to_block.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(accounts_to_block.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute accounts that should be unblocked
         accounts_to_unblock = self._get_dict_keys_relative_complement(
@@ -953,12 +990,15 @@ class VectraAutomatedResponse(object):
             str(len(accounts_to_unblock.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+
+        if len(accounts_to_unblock.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         return accounts_to_block, accounts_to_unblock
 
-    def get_detections_to_block_unblock(self, alert=False):
+    def get_detections_to_block_unblock(self):
         # Get a list of all detections that should be unblocked or never blocked
         no_block_detections = self.vectra_api_client.get_noblock_detections(
             no_block_group=self.no_block_host_group_name
@@ -971,15 +1011,18 @@ class VectraAutomatedResponse(object):
         )
         # Get a dict of detections already blocked
         blocked_detections = self.vectra_api_client.get_tagged_detections(
-            tag="VAR Blocked"
+            tag="VAR Detection Blocked"
         )
 
         message = "Found {} already blocked detections on Vectra".format(
             str(len(blocked_detections.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(blocked_detections.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Find blocked detections that should be unblocked
         detections_wrongly_blocked = self._get_dict_keys_intersect(
@@ -990,8 +1033,11 @@ class VectraAutomatedResponse(object):
             str(len(detections_wrongly_blocked.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(detections_wrongly_blocked.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute detections that should be blocked
         detections_to_block = self._get_dict_keys_relative_complement(
@@ -1006,8 +1052,11 @@ class VectraAutomatedResponse(object):
             str(len(detections_to_block.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(detections_to_block.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         # Compute detections that should be unblocked
         detections_to_unblock = self._get_dict_keys_relative_complement(
@@ -1020,12 +1069,15 @@ class VectraAutomatedResponse(object):
             str(len(detections_to_unblock.keys()))
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(detections_to_unblock.keys()) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         return detections_to_block, detections_to_unblock
 
-    def get_static_dst_ips_to_block_unblock(self, alert=False):
+    def get_static_dst_ips_to_block_unblock(self):
         # Read in currently blocked IPs
         def valid_ip(ip):
             try:
@@ -1077,8 +1129,11 @@ class VectraAutomatedResponse(object):
             len(ips_to_block), len(ips_to_unblock)
         )
 
-        self.logger.info(message)
-        self.info_msg.append(message)
+        self.logger.debug(message)
+        
+        if len(ips_to_block) > 0 or len(ips_to_unblock) > 0:
+            self.logger.info(message)
+            self.info_msg.append(message)
 
         return ips_to_block, ips_to_unblock
 
@@ -1086,41 +1141,41 @@ class VectraAutomatedResponse(object):
         for host_id, host in hosts_to_block.items():
             for third_party_client in self.third_party_clients:
                 try:
-                    # Quarantaine endpoint
+                    # Block endpoint
                     blocked_elements = third_party_client.block_host(host=host)
-                    message = "Blocked host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
-                        )
-                    self.logger.info(message)
-                    self.info_msg.append(message)
-                    # Set a "VAR Blocked" to set the host as being blocked and registered what elements were blocked in
-                    # separate tags
-                    tag_to_set = host.tags 
-                    tag_to_set.append("VAR Blocked")
-                    if len(blocked_elements) < 1:
-                        message = "Did not find any elements to block on host ID {}".format(
-                                host_id
+                    if len(blocked_elements) > 0:
+                        message = "Blocked host {id} on client {client}".format(
+                                id=host_id, client=third_party_client.name
                             )
+                        self.logger.info(message)
+                        self.info_msg.append(message)
+                        # Set a "VAR Host Blocked" to set the host as being blocked and registered what elements were blocked in
+                        # separate tags
+                        tag_to_set = host.tags 
+                        tag_to_set.append("VAR Host Blocked")                          
+                        for element in blocked_elements:
+                            tag_to_set.append(
+                                "VAR ID:{client_class}:{id}".format(
+                                    client_class=third_party_client.name,
+                                    id=element,
+                                )
+                            )
+                        self.vectra_api_client.set_host_tags(
+                            host_id=host_id, tags=tag_to_set, append=False
+                        )
+                        self.vectra_api_client.set_host_note(
+                            host_id=host_id,
+                            note="VAR: Blocked on {}".format(
+                                datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                            ),
+                        )
+                        self.logger.debug("Added Tags to host")
+                    else:
+                        message = "Did not find any elements to block on host ID {}".format(
+                            host_id
+                        )
                         self.logger.warning(message)
                         self.warn_msg.append(message)
-                        
-                    for element in blocked_elements:
-                        tag_to_set.append(
-                            "VAR ID:{client_class}:{id}".format(
-                                client_class=third_party_client.name,
-                                id=element,
-                            )
-                        )
-                    self.vectra_api_client.set_host_tags(
-                        host_id=host_id, tags=tag_to_set, append=False
-                    )
-                    self.vectra_api_client.set_host_note(
-                        host_id=host_id,
-                        note="VAR: Automatically blocked on {}".format(
-                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
-                        ),
-                    )
-                    self.logger.debug("Added Tags to host")
                 except HTTPException as e:
                     message = "Error encountered trying to block Host ID {}: {}".format(
                             host.id, str(e)
@@ -1128,56 +1183,10 @@ class VectraAutomatedResponse(object):
                     self.logger.error(message)
                     self.err_msg.append(message)
 
-    def block_accounts(self, accounts_to_block):
-        for account_id, account in accounts_to_block.items():
-            for third_party_client in self.third_party_clients:
-                try:
-                    # Quarantaine account
-                    blocked_elements = third_party_client.block_account(account=account)
-                    message = "Blocked account {id} on client {client}".format(
-                            id=account_id, client=third_party_client.name
-                        )
-                    self.logger.info(message)
-                    self.info_msg.append(message)
-                    
-                    # Set a "VAR Blocked" to set the account as being blocked and registered what elements were blocked
-                    # in separate tags
-                    tag_to_set = account.tags
-                    tag_to_set.append("VAR Blocked")
-                    if len(blocked_elements) < 1:
-                        message =                             "Did not find any elements to block on account ID {}".format(
-                                account_id
-                            )
-                        self.logger.warning(message)
-                        self.warn_msg.append(message)
-                        
-                    for element in blocked_elements:
-                        tag_to_set.append(
-                            "VAR ID:{client_class}:{id}".format(
-                                client_class=third_party_client.name,
-                                id=element,
-                            )
-                        )
-                    self.vectra_api_client.set_account_tags(
-                        account_id=account_id, tags=tag_to_set, append=False
-                    )
-                    self.vectra_api_client.set_account_note(
-                        account_id=account_id,
-                        note="VAR: Automatically blocked on {}".format(
-                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
-                        ),
-                    )
-                    self.logger.debug("Added Tags to account")
-                except HTTPException as e:
-                    message = "Error encountered trying to block account ID {}: {}".format(
-                            account.id, str(e)
-                        )
-                    self.logger.error(message)
-                    self.err_msg.append(message)
-
     def unblock_hosts(self, hosts_to_unblock):
         for host_id, host in hosts_to_unblock.items():
-            if len(host.blocked_elements) < 1:
+            blocked_elements = host.blocked_elements
+            if len(blocked_elements) < 1:
                 message = "Could not find what was blocked on host {}".format(host.name)
                 self.logger.error(message)
                 self.err_msg.append(message)
@@ -1185,78 +1194,51 @@ class VectraAutomatedResponse(object):
             for third_party_client in self.third_party_clients:
                 try:
                     unblocked_elements = third_party_client.unblock_host(host)
-                    for element in unblocked_elements:
-                        self.logger.debug("Unblocked element {}".format(element))
-                    message = "Unquarantained host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
-                        )
-                    self.logger.info(message)
-                    self.info_msg.append(message)
-                    
-                    # Remove all tags set by this script from the host.
-                    if "block" in host.tags:
-                        message = 'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
-                                host["name"]
+                    if len(unblocked_elements) > 0:
+                        for element in unblocked_elements:
+                            blocked_elements[third_party_client.name].remove(element)
+                            self.logger.debug("Unblocked element {}".format(element))
+                        message = "Unblocked host {id} on client {client}".format(
+                                id=host_id, client=third_party_client.name
                             )
-                        self.logger.warning(message)
-                        self.warn_msg.append(message)
-                        host.tags.remove("block")
-                        
-                    self.vectra_api_client.set_host_tags(
-                        host_id=host_id, tags=host.tags, append=False
-                    )
-                    self.vectra_api_client.set_host_note(
-                        host_id=host_id,
-                        note="VAR: Automatically unblocked on {}".format(
-                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
-                        ),
-                    )
-                    self.logger.debug("Removed tags")
+                        tags = host.tags
+                        if len(blocked_elements[third_party_client.name]) > 0:
+                            tags.append("VAR Host Blocked")                          
+                            for element in blocked_elements[third_party_client.name]:
+                                tags.append(
+                                    "VAR ID:{client_class}:{id}".format(
+                                        client_class=third_party_client.name,
+                                        id=element,
+                                    )
+                                )
+                        self.logger.info(message)
+                        self.info_msg.append(message)
+                        # Remove all tags set by this script from the host.
+                        if "block" in tags:
+                            message = 'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
+                                    host["name"]
+                                )
+                            self.logger.warning(message)
+                            self.warn_msg.append(message)
+                            tags.remove("block")
+                            
+                        self.vectra_api_client.set_host_tags(
+                            host_id=host_id, tags=tags, append=False
+                        )
+                        self.vectra_api_client.set_host_note(
+                            host_id=host_id,
+                            note="VAR: Unblocked on {}".format(
+                                datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                            ),
+                        )
+                        self.logger.debug("Removed tags")
+                    else:
+                        message = "Could not unblock host {} element(s) {}".format(host.name, blocked_elements[third_party_client.name] )
+                        self.logger.error(message)
+                        self.err_msg.append(message)
                 except HTTPException as e:
                     message = "Error encountered trying to unblock Host ID{}: {}".format(
                             host.id, str(e)
-                        )
-                    self.logger.error(message)
-                    self.err_msg.append(message)
-
-    def unblock_accounts(self, accounts_to_unblock):
-        for account_id, account in accounts_to_unblock.items():
-            if len(account.blocked_elements) < 1:
-                message = "Could not find what was blocked on account {}".format(account.name)
-                self.logger.error(message)
-                self.err_msg.append(message)
-                continue
-            for third_party_client in self.third_party_clients:
-                try:
-                    unblocked_elements = third_party_client.unblock_account(account)
-                    for element in unblocked_elements:
-                        self.logger.debug("Unblocked element {}".format(element))
-                    self.logger.info(
-                        "Unblocked account {id} on client {client}".format(
-                            id=account_id, client=third_party_client.name
-                        )
-                    )
-                    # Remove all tags set by this script from the account.
-                    if "block" in account.tags:
-                        message = 'Account {} is in no-block list but has a "block" tag. Removing tag..'.format(
-                                account.display_name
-                            )
-                        self.logger.warning(message)
-                        self.warn_msg.append(message)
-                        account.tags.remove("block")
-                    self.vectra_api_client.set_account_tags(
-                        account_id=account_id, tags=account.tags, append=False
-                    )
-                    self.vectra_api_client.set_account_note(
-                        account_id=account_id,
-                        note="VAR: Automatically unblocked on {}".format(
-                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
-                        ),
-                    )
-                    self.logger.debug("Removed tags")
-                except HTTPException as e:
-                    message = "Error encountered trying to unblock Account ID{}: {}".format(
-                            account.id, str(e)
                         )
                     self.logger.error(message)
                     self.err_msg.append(message)
@@ -1276,7 +1258,7 @@ class VectraAutomatedResponse(object):
                         unblocked_elements = third_party_client.unblock_host(host)
                         for element in unblocked_elements:
                             self.logger.debug("Unblocked element {}".format(element))
-                        message = "Unquarantained host {id} on client {client}".format(
+                        message = "Unblocked host {id} on client {client}".format(
                                 id=host_id, client=third_party_client.name
                             )
                         self.logger.info(message)
@@ -1287,7 +1269,7 @@ class VectraAutomatedResponse(object):
                         )
                         self.vectra_api_client.set_host_note(
                             host_id=host_id,
-                            note="VAR: Automatically unblocked due to grooming on {}".format(
+                            note="VAR: Unblocked due to grooming on {}".format(
                                 datetime.now().strftime("%d %b %Y at %H:%M:%S")
                             ),
                         )
@@ -1304,16 +1286,16 @@ class VectraAutomatedResponse(object):
                     self.logger.info(message)
                     self.info_msg.append(message)
                     try:
-                        # Quarantaine endpoint
+                        # Block endpoint
                         blocked_elements = third_party_client.block_host(host=host)
                         message = "Blocked host {id} on client {client}".format(
                                 id=host_id, client=third_party_client.name
                             )
                         self.logger.info(message)
                         self.info_msg.append(message)
-                        # Set a "VAR Blocked" to set the host as being blocked and registered what elements were
+                        # Set a "VAR Host Blocked" to set the host as being blocked and registered what elements were
                         # blocked in separate tags
-                        tag_to_set = ["VAR Blocked"]
+                        tag_to_set = ["VAR Host Blocked"]
                         if len(blocked_elements) < 1:
                             message = "Did not find any elements to block on host ID {}".format(
                                     host_id
@@ -1332,7 +1314,7 @@ class VectraAutomatedResponse(object):
                         )
                         self.vectra_api_client.set_host_note(
                             host_id=host_id,
-                            note="VAR: Automatically blocked on {}".format(
+                            note="VAR: Blocked on {}".format(
                                 datetime.now().strftime("%d %b %Y at %H:%M:%S")
                             ),
                         )
@@ -1344,47 +1326,152 @@ class VectraAutomatedResponse(object):
                         self.logger.error(message)
                         self.err_msg.append(message)
 
+    def block_accounts(self, accounts_to_block):
+        for account_id, account in accounts_to_block.items():
+            for third_party_client in self.third_party_clients:
+                try:
+                    # Block account
+                    blocked_elements = third_party_client.block_account(account=account)
+                    if len(blocked_elements) > 0:
+                        message = "Blocked account {id} on client {client}".format(
+                                id=account_id, client=third_party_client.name
+                            )
+                        self.logger.info(message)
+                        self.info_msg.append(message)
+                        
+                        # Set a "VAR Account Blocked" to set the account as being blocked and registered what elements were blocked
+                        # in separate tags
+                        tag_to_set = account.tags
+                        tag_to_set.append("VAR Account Blocked")                            
+                            
+                        for element in blocked_elements:
+                            tag_to_set.append(
+                                "VAR ID:{client_class}:{id}".format(
+                                    client_class=third_party_client.name,
+                                    id=element,
+                                )
+                            )
+                        self.vectra_api_client.set_account_tags(
+                            account_id=account_id, tags=tag_to_set, append=False
+                        )
+                        self.vectra_api_client.set_account_note(
+                            account_id=account_id,
+                            note="VAR: Blocked on {}".format(
+                                datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                            ),
+                        )
+                        self.logger.debug("Added Tags to account")
+                    else:
+                        message = "Did not find any elements to block on account ID {}".format(
+                            account_id
+                        )
+                        self.logger.warning(message)
+                        self.warn_msg.append(message)
+                    
+                except HTTPException as e:
+                    message = "Error encountered trying to block account ID {}: {}".format(
+                            account.id, str(e)
+                        )
+                    self.logger.error(message)
+                    self.err_msg.append(message)
+                    
+    def unblock_accounts(self, accounts_to_unblock):
+        for account_id, account in accounts_to_unblock.items():
+            blocked_elements = account.blocked_elements
+            if len(blocked_elements) < 1:
+                message = "Could not find what was blocked on account {}".format(account.name)
+                self.logger.error(message)
+                self.err_msg.append(message)
+                continue
+            for third_party_client in self.third_party_clients:
+                try:
+                    unblocked_elements = third_party_client.unblock_account(account)
+                    if len(unblocked_elements) > 0:
+                        for element in unblocked_elements:
+                            blocked_elements[third_party_client.name].remove(element)
+                            self.logger.debug("Unblocked element {}".format(element))
+                        self.logger.info(
+                            "Unblocked account {id} on client {client}".format(
+                                id=account_id, client=third_party_client.name
+                            )
+                        )
+                        # Remove all tags set by this script from the account.
+                        if "block" in account.tags:
+                            message = 'Account {} is in no-block list but has a "block" tag. Removing tag..'.format(
+                                    account.display_name
+                                )
+                            self.logger.warning(message)
+                            self.warn_msg.append(message)
+                            account.tags.remove("block")
+                        self.vectra_api_client.set_account_tags(
+                            account_id=account_id, tags=account.tags, append=False
+                        )
+                        self.vectra_api_client.set_account_note(
+                            account_id=account_id,
+                            note="VAR: Unblocked on {}".format(
+                                datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                            ),
+                        )
+                        self.logger.debug("Removed tags")
+                    else:
+                        message = "Could not unblock account {}".format(account.name)
+                        self.logger.error(message)
+                        self.err_msg.append(message)
+                except HTTPException as e:
+                    message = "Error encountered trying to unblock Account ID{}: {}".format(
+                            account.id, str(e)
+                        )
+                    self.logger.error(message)
+                    self.err_msg.append(message)
+
     def block_detections(self, detections_to_block):
         for detection_id, detection in detections_to_block.items():
             for third_party_client in self.third_party_clients:
                 try:
-                    # Quarantaine endpoint
+                    # Block endpoint
                     blocked_elements = third_party_client.block_detection(
                         detection=detection
                     )
-                    # Set a "VAR Blocked" to set the detection as being blocked and registered what elements were
-                    # blocked in separate tags
-                    tag_to_set = detection.tags
-                    tag_to_set.append("VAR Blocked")
-                    if len(blocked_elements) < 1:
+                    if len(blocked_elements) > 0:
+                        # Set a "VAR Detection Blocked" to set the detection as being blocked and registered what elements were
+                        # blocked in separate tags
+                        tag_to_set = detection.tags
+                        tag_to_set.append("VAR Detection Blocked")
+                        if len(blocked_elements) < 1:
+                            message = "Did not find any elements to block on detection ID {}".format(
+                                    detection.id
+                                )
+                            self.logger.warning(message)
+                            self.warn_msg.append(message)
+                        for element in blocked_elements:
+                            tag_to_set.append(
+                                "VAR ID:{client_class}:{id}".format(
+                                    client_class=third_party_client.name,
+                                    id=element,
+                                )
+                            )
+                        message = "Blocked detection ID {id} on client {client}".format(
+                                id=detection.id,
+                                client=third_party_client.name,
+                            )
+                        self.logger.info(message)
+                        self.info_msg.append(message)
+                        self.vectra_api_client.set_detection_tags(
+                            detection_id=detection_id, tags=tag_to_set, append=False
+                        )
+                        self.vectra_api_client.set_detection_note(
+                            detection_id=detection.id,
+                            note="VAR: Blocked on {}".format(
+                                datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                            ),
+                        )
+                        self.logger.debug("Added Tags to detection")
+                    else:
                         message = "Did not find any elements to block on detection ID {}".format(
-                                detection.id
-                            )
+                            detection.id
+                        )
                         self.logger.warning(message)
-                        self.warn_msg.append(message)
-                    for element in blocked_elements:
-                        tag_to_set.append(
-                            "VAR ID:{client_class}:{id}".format(
-                                client_class=third_party_client.name,
-                                id=element,
-                            )
-                        )
-                    message = "Blocked detection ID {id} on client {client}".format(
-                            id=detection.id,
-                            client=third_party_client.name,
-                        )
-                    self.logger.info(message)
-                    self.info_msg.append(message)
-                    self.vectra_api_client.set_detection_tags(
-                        detection_id=detection_id, tags=tag_to_set, append=False
-                    )
-                    self.vectra_api_client.set_detection_note(
-                        detection_id=detection.id,
-                        note="VAR: Automatically blocked on {}".format(
-                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
-                        ),
-                    )
-                    self.logger.debug("Added Tags to detection")
+                        self.warn_msg.append(message)                        
                 except HTTPException as e:
                     message = "Error encountered trying to block detection ID {}: {}".format(
                             detection.id, str(e)
@@ -1394,12 +1481,19 @@ class VectraAutomatedResponse(object):
 
     def unblock_detections(self, detections_to_unblock):
         for detection_id, detection in detections_to_unblock.items():
+            blocked_elements = detection.blocked_elements
+            if len(blocked_elements) < 1:
+                message = "Could not find what was blocked on detection {}".format(detection.id)
+                self.logger.error(message)
+                self.err_msg.append(message)
+                continue
             for third_party_client in self.third_party_clients:
                 try:
                     unblocked_elements = third_party_client.unblock_detection(detection)
                     for element in unblocked_elements:
+                        blocked_elements[third_party_client.name].remove(element)
                         self.logger.debug("Unblocked element {}".format(element))
-                    message = "Unquarantaine detection ID {id} on {client}".format(
+                    message = "Unblock detection ID {id} on {client}".format(
                             id=detection.id,
                             client=third_party_client.name,
                         )
@@ -1416,7 +1510,17 @@ class VectraAutomatedResponse(object):
                     self.vectra_api_client.set_detection_tags(
                         detection_id=detection_id, tags=detection.tags, append=False
                     )
+                    self.vectra_api_client.set_detection_note(
+                        detection_id=detection.id,
+                        note="VAR: Unblocked on {}".format(
+                            datetime.now().strftime("%d %b %Y at %H:%M:%S")
+                        ),
+                    )
                     self.logger.debug("Removed tags")
+                    # else:
+                    #     message = "Could not unblock detection {}".format(detection.id)
+                    #     self.logger.error(message)
+                    #     self.err_msg.append(message)
                 except HTTPException as e:
                     message = "Error encountered trying to unblock detection ID {}: {}".format(
                             detection.id, str(e)
@@ -1518,21 +1622,49 @@ def main():
             action="store_true",
             help="Attempt to re-block hosts to accommodate changes to IP addresses.",
         )
+        parser.add_argument(
+            "--alert",
+            default=False,
+            action="store_true",
+            help="Show what is found, but don't take action.",
+        )
+        parser.add_argument(
+            "--debug",
+            default=False,
+            action="store_true",
+            help="Set DEBUG log level.",
+        )
+        
         return parser.parse_args()
 
     args = obtain_args()
+    
+    log_conf(args.debug)
 
     if args.keyring:
         # Modules enabled to utilize Keyring
-        vectra_api_client = VectraClient(
-            url=COGNITO_URL, token=keyring.get_password("VAR", "Detect")
-        )
+        if V3:
+            vectra_api_client = VectraClient(
+                url=COGNITO_URL, 
+                client_id=keyring.get_password("V3_Client_ID", "Platform"), 
+                secret_key=keyring.get_password("V3_Secret_Key", "Platform")
+            )
+        else:
+            vectra_api_client = VectraClient(
+                url=COGNITO_URL, token=keyring.get_password("V2_Token", "Detect")
+            )
     else:
-        # define required clients
-        vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
-        third_party_clients = [
-            Third_Party_Client.Client() for Third_Party_Client in Third_Party_Clients
-        ]
+        if V3:
+            vectra_api_client = VectraClient(
+                url=COGNITO_URL, 
+                client_id=CLIENT_ID, 
+                secret_key=SECRET_KEY
+            )
+        else:
+            vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+    third_party_clients = [
+        Third_Party_Client.Client() for Third_Party_Client in Third_Party_Clients
+    ]
 
     var = VectraAutomatedResponse(
         third_party_clients=third_party_clients,
@@ -1565,20 +1697,18 @@ def main():
         )
         syslog.addHandler(syslog_handle)
 
-    def take_action(alert=False):
+    def take_action(alert):
         (
             hosts_to_block,
             hosts_to_unblock,
             hosts_to_groom,
-        ) = var.get_hosts_to_block_unblock(groom=args.groom, alert=alert)
+        ) = var.get_hosts_to_block_unblock(groom=args.groom)
         if not alert:
             var.block_hosts(hosts_to_block)
             var.unblock_hosts(hosts_to_unblock)
             var.groom_hosts(hosts_to_groom)
 
-        accounts_to_block, accounts_to_unblock = var.get_accounts_to_block_unblock(
-            alert=alert
-        )
+        accounts_to_block, accounts_to_unblock = var.get_accounts_to_block_unblock()
         if not alert:
             var.block_accounts(accounts_to_block)
             var.unblock_accounts(accounts_to_unblock)
@@ -1586,7 +1716,7 @@ def main():
         (
             detections_to_block,
             detections_to_unblock,
-        ) = var.get_detections_to_block_unblock(alert=alert)
+        ) = var.get_detections_to_block_unblock()
         if not alert:
             var.block_detections(detections_to_block)
             var.unblock_detections(detections_to_unblock)
@@ -1594,15 +1724,14 @@ def main():
         (
             static_dst_ips_to_block,
             static_ips_to_unblock,
-        ) = var.get_static_dst_ips_to_block_unblock(alert=alert)
+        ) = var.get_static_dst_ips_to_block_unblock()
         if not alert:
             var.block_static_dst_ips(static_dst_ips_to_block)
             var.unblock_static_dst_ips(static_ips_to_unblock)
 
-        if alert:
-            var.test()
-
         generate_messages((var.info_msg, var.warn_msg, var.err_msg))
+        if len(var.info_msg) == len(var.warn_msg) == len(var.err_msg) == 0:
+            logging.info("No actions taken.")
         logging.info("Run finished. \n\n\n")
 
     def create_block_days():
@@ -1668,11 +1797,11 @@ def main():
                         end -= timedelta(hours=24)
 
                 while start <= datetime.now() <= end:
-                    take_action()
+                    take_action(args.alert)
                     time.sleep(60 * SLEEP_MINUTES)
 
-                take_action(alert=True)
-                time.sleep(60 * SLEEP_MINUTES)
+                # take_action(args.alert)
+                # time.sleep(60 * SLEEP_MINUTES)
                 init = False
 
                 if test.weekday() != datetime.now().weekday():
@@ -1681,11 +1810,11 @@ def main():
                     end += timedelta(hours=24)
                 logging.info("Not within automated response window.")
             else:
-                take_action(alert=True)
+                take_action(args.alert)
 
             time.sleep(60 * SLEEP_MINUTES)
     else:
-        take_action()
+        take_action(args.alert)
 
 
 if __name__ == "__main__":

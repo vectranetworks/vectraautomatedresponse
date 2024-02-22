@@ -1,4 +1,4 @@
-PXGRID_APPLIANCE_IP = "" # fqdn or ip of pxgrid
+PXGRID_APPLIANCE_LIST = [""] # list of fqdn or ip of pxgrid
 PXGRID_PORT = 8910
 PXGRID_USERNAME = "" 
 PXGRID_PASSWORD = "" 
