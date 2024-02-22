@@ -97,7 +97,7 @@ class VectraHost:
     def _get_external_tags(self, tags):
         tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Blocked","block","unblock"]:
+            if not tag.startswith("VAR ID:") and tag not in ["VAR Host Blocked"]:
                 tags_to_keep.append(tag)
         return tags_to_keep
 
@@ -133,7 +133,7 @@ class VectraAccount:
 
     def _get_ldap(self):
         values = {}
-        if self._raw.get("ldap") is not None:
+        if self._raw.get("ldap")["profiles"] != {}:
             values["description"] = self._raw["description"]
             values["location"] = self._raw["location"]
             values["sam_account_name"] = self._raw["sAMAccountName"]
@@ -169,7 +169,7 @@ class VectraAccount:
     def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Blocked","block","unblock"]:
+            if not tag.startswith("VAR ID:") and tag not in ["VAR Account Blocked"]:
                 tags_to_keep.append(tag)
         return tags_to_keep
 
@@ -227,8 +227,8 @@ class VectraDetection:
         return blocked_elements
 
     def _get_external_tags(self, tags):
-        tags = []
+        tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Blocked","block","unblock"]:
-                tags.append(tag)
-        return tags
+            if not tag.startswith("VAR ID:") and tag not in ["VAR Detection Blocked"]:
+                tags_to_keep.append(tag)
+        return tags_to_keep

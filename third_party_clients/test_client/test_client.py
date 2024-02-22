@@ -22,10 +22,10 @@ class Client(ThirdPartyInterface):
         return [id]
 
     def unblock_host(self, host):
-        return host.blocked_elements.get(self.__class__.__name__)
+        return host.blocked_elements.get(self.name)
 
     def unblock_account(self, account):
-        return account.blocked_elements.get(self.__class__.__name__)
+        return account.blocked_elements.get(self.name)
 
     def groom_host(self, host) -> dict:
         return {"block": [], "unblock": []}
@@ -35,7 +35,7 @@ class Client(ThirdPartyInterface):
         return [id]
 
     def unblock_detection(self, detection):
-        return detection.blocked_elements.get(self.__class__.__name__)
+        return detection.blocked_elements.get(self.name)
 
     def block_static_dst_ips(self, dst_ips):
         self.logger.info(

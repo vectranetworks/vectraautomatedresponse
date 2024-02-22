@@ -9,7 +9,7 @@ import requests
 import urllib3
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from third_party_clients.cisco_pxgrid.pxgrid_config import (
-    PXGRID_APPLIANCE_IP,
+    PXGRID_APPLIANCE_LIST,
     PXGRID_CERT,
     PXGRID_KEY,
     PXGRID_KEY_PASSWORD,
@@ -68,7 +68,7 @@ class HTTPException(Exception):
 class Config:
     def __init__(self):
         self.__ssl_context = None
-        self.pxgrid_appliance = PXGRID_APPLIANCE_IP
+        self.pxgrid_appliance_list = PXGRID_APPLIANCE_LIST
         self.pxgrid_port = PXGRID_PORT
         self.username = PXGRID_USERNAME
         self.password = PXGRID_PASSWORD
@@ -83,8 +83,8 @@ class Config:
             "Content-Type": "application/json",
         }
 
-    def get_pxgrid_appliance(self):
-        return self.pxgrid_appliance
+    def get_pxgrid_appliance_list(self):
+        return self.pxgrid_appliance_list
 
     def get_pxgrid_port(self):
         return self.pxgrid_port
@@ -140,13 +140,15 @@ class PxgridControl:
         self.config = config
 
     # Does not respond with a 200
-    def send_rest_request(self, url_suffix, payload):
-        url = f"https://{self.config.get_pxgrid_appliance()}:{self.config.get_pxgrid_port()}/pxgrid/control/{url_suffix}"
+    def send_rest_request(self, appliance, url_suffix, payload):
+        url = f"https://{appliance}:{self.config.get_pxgrid_port()}/pxgrid/control/{url_suffix}"
+        # full_url = f"https://{url}:{self.config.get_pxgrid_port()}/pxgrid/control/{url_suffix}"
 
         json_string = json.dumps(payload)
         handler = urllib.request.HTTPSHandler(context=self.config.ssl_context())
         opener = urllib.request.build_opener(handler)
         rest_request = urllib.request.Request(url=url, data=str.encode(json_string))
+        # rest_request = urllib.request.Request(url=full_url, data=str.encode(json_string))
         rest_request.add_header("Content-Type", "application/json")
         rest_request.add_header("Accept", "application/json")
         username_password = "%s:%s" % (self.config.username, self.config.password)
@@ -156,24 +158,24 @@ class PxgridControl:
         response = rest_response.read().decode()
         return json.loads(response)
 
-    def account_activate(self):
+    def account_activate(self, appliance):
         payload = {}
         # Does not like a description
         if self.config.get_description() is not None:
             payload = {"description": self.config.get_description()}
-        return self.send_rest_request("AccountActivate", payload)
+        return self.send_rest_request(appliance, "AccountActivate", payload)
 
-    def service_lookup(self, service_name):
+    def service_lookup(self, appliance, service_name):
         payload = {"name": service_name}
-        return self.send_rest_request("ServiceLookup", payload)
+        return self.send_rest_request(appliance, "ServiceLookup", payload)
 
-    def service_register(self, service_name, properties):
+    def service_register(self, appliance, service_name, properties):
         payload = {"name": service_name, "properties": properties}
-        return self.send_rest_request("ServiceRegister", payload)
+        return self.send_rest_request(appliance, "ServiceRegister", payload)
 
-    def get_access_secret(self, peer_node_name):
+    def get_access_secret(self, appliance, peer_node_name):
         payload = {"peerNodeName": peer_node_name}
-        return self.send_rest_request("AccessSecret", payload)
+        return self.send_rest_request(appliance, "AccessSecret", payload)
 
 
 class Client(ThirdPartyInterface):
@@ -203,13 +205,20 @@ class Client(ThirdPartyInterface):
         :param password: Password to authenticate to PXGRID - required
         :param verify: Verify SSL (default: False) - optional
         """
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger("PxGrid")
         self.config = Config()
         self.pxgrid = PxgridControl(config=self.config)
-
-        """Why did my test need .json(), and it failed when running in in VAR"""
-        while self.pxgrid.account_activate()["accountState"] != "ENABLED":
-            time.sleep(60)
+        self.enabled = False
+        self.appliance_list = self.config.get_pxgrid_appliance_list()
+        
+        while not self.enabled: 
+            for appliance in self.appliance_list:
+                if self.pxgrid.account_activate(appliance)["accountState"] == "ENABLED":
+                    self.enabled = True
+                    self.appliance = appliance
+                    break
+                else:
+                    time.sleep(60/len(self.appliance_list))
 
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
@@ -256,15 +265,21 @@ class Client(ThirdPartyInterface):
                 pass
 
         # Iterate through all known MAC addresses
+        macs = []
         for mac_address in mac_addresses:
-            self._quarantaine_endpoint(mac_address)
-        return mac_addresses
+            result = self._quarantaine_endpoint(mac_address)
+            if result:
+                macs.append(mac_address)
+        return macs
 
     def unblock_host(self, host):
+        macs = []
         mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
-            self._unquarantaine_endpoint(mac_address)
-        return mac_addresses
+            result = self._unquarantaine_endpoint(mac_address)
+            if result:
+                macs.append(mac_address)
+        return macs
 
     def groom_host(self, host) -> dict:
         self.logger.warning("PXGRID client does not implement host grooming")
@@ -297,21 +312,20 @@ class Client(ThirdPartyInterface):
 
     def _quarantaine_endpoint(self, mac_address):
         """
-        Put an endpoint in the Quarantaine policy based on its MAC or IP address
+        Put an endpoint in the Quarantaine policy based on its MAC
         :param address: address of the endpoint to quarantaine - required
         :param key: type of address; "mac" or "ip" - required
         :rtype: None
         """
-        self._add_mac_to_policy(mac_address, self.config.quarantine_policy)
+        return self._add_mac_to_policy(mac_address, self.config.quarantine_policy)
 
     def _unquarantaine_endpoint(self, mac_address):
         """
         Put an endpoint in the Quarantaine policy based on its MAC or IP address
         :param address: address of the endpoint to quarantaine - required
-        :param key: type of address; "mac" or "ip" - required
         :rtype: None
         """
-        self._rem_mac_from_policy(mac_address)
+        return self._rem_mac_from_policy(mac_address)
 
     def _add_mac_to_policy(self, mac_address, policy_name):
         """
@@ -320,21 +334,31 @@ class Client(ThirdPartyInterface):
         :param policy_name: name of the policy to add the endpoint to
         :rtype: Requests.Response
         """
-        service_lookup_response = self.pxgrid.service_lookup("com.cisco.ise.config.anc")
-        service = service_lookup_response["services"][0]
-        node_name = service["nodeName"]
-        url = service["properties"]["restBaseUrl"] + "/applyEndpointByMacAddress"
+        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.config.anc")
+        services = service_lookup_response["services"]
+        for service in services:
+            node_name = service["nodeName"]
+            url = service["properties"]["restBaseUrl"] + "/applyEndpointByMacAddress"
 
-        payload = {"macAddress": mac_address, "policyName": policy_name}
+            payload = {"macAddress": mac_address, "policyName": policy_name}
 
-        secret = self.pxgrid.get_access_secret(node_name)["secret"]
+            secret = self.pxgrid.get_access_secret(self.appliance, node_name)["secret"]
 
-        self._request(
-            method="post",
-            url=url,
-            auth=(self.config.username, secret),
-            payload=payload,
-        )
+            response = self._request(
+                method="post",
+                url=url,
+                auth=(self.config.username, secret),
+                payload=payload,
+            )
+            
+            self.logger.debug(f"Block response: {response.json()}")
+            if response.status_code == 200:
+                if response.json()["status"] != "FAILURE":
+                    return True
+                elif response.json()["failureReason"] == "mac address is already associated with this policy":
+                    return True
+        self.logger.error(f"Failed to add host to policy {policy_name}. Reason: {response.json()['failureReason']}")
+        return False
 
     def _rem_mac_from_policy(self, mac_address):
         """
@@ -343,22 +367,29 @@ class Client(ThirdPartyInterface):
         :rtype: Requests.Response
         """
 
-        service_lookup_response = self.pxgrid.service_lookup("com.cisco.ise.config.anc")
-        service = service_lookup_response["services"][0]
-        node_name = service["nodeName"]
-        url = service["properties"]["restBaseUrl"] + "/clearEndpointByMacAddress"
-        secret = self.pxgrid.get_access_secret(node_name)["secret"]
+        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.config.anc")
+        services = service_lookup_response["services"]
+        for service in services:
+            node_name = service["nodeName"]
+            url = service["properties"]["restBaseUrl"] + "/clearEndpointByMacAddress"
+            secret = self.pxgrid.get_access_secret(self.appliance, node_name)["secret"]
 
-        payload = {
-            "macAddress": mac_address,
-        }
+            payload = {
+                "macAddress": mac_address,
+            }
 
-        self._request(
-            method="post",
-            url=url,
-            auth=(self.config.username, secret),
-            payload=payload,
-        )
+            response = self._request(
+                method="post",
+                url=url,
+                auth=(self.config.username, secret),
+                payload=payload,
+            )
+
+            self.logger.debug(f"Unblock response: {response.json()}")
+            if response.status_code == 200 and response.json()["status"] != "FAILURE":
+                return True
+        self.logger.error("Failed to remove host {} from blocking policy.".format(mac_address))
+        return False
 
     def _get_mac_from_ip(self, ip_address):
         """
@@ -367,25 +398,26 @@ class Client(ThirdPartyInterface):
         :rtype: string
         """
         mac_addresses = []
-        service_lookup_response = self.pxgrid.service_lookup("com.cisco.ise.session")
-        service = service_lookup_response["services"][0]
-        node_name = service["nodeName"]
-        url = service["properties"]["restBaseUrl"] + "/getSessions"
+        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.session")
+        services = service_lookup_response["services"]
+        for service in services:
+            node_name = service["nodeName"]
+            url = service["properties"]["restBaseUrl"] + "/getSessions"
 
-        payload = {}
+            payload = {}
 
-        secret = self.pxgrid.get_access_secret(node_name)["secret"]
+            secret = self.pxgrid.get_access_secret(self.appliance, node_name)["secret"]
 
-        response = self._request(
-            method="post",
-            url=url,
-            auth=(self.config.username, secret),
-            payload=payload,
-        )
+            response = self._request(
+                method="post",
+                url=url,
+                auth=(self.config.username, secret),
+                payload=payload,
+            )
 
-        sessions = response.json()["sessions"]
-        for session in sessions:
-            if session["nasIpAddress"] == ip_address:
-                mac_addresses.append(session["macAddress"])
+            sessions = response.json()["sessions"]
+            for session in sessions:
+                if session["nasIpAddress"] == ip_address:
+                    mac_addresses.append(session["macAddress"])
 
-        return mac_addresses
+            return mac_addresses
