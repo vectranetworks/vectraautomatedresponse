@@ -30,3 +30,4 @@ weakrefmethod
 cachetools
 python-dotenv
 mcafee-epo
+questionary
