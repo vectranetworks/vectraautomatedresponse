@@ -1,7 +1,11 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = "https://fqdn or ip"
+COGNITO_URL = "https://<fqdn or ip>"
 COGNITO_TOKEN = "api token"
+COGNITO_CLIENT_ID = "client_id"
+COGNITO_SECRET_KEY = "secret_key"
+# V3 is a boolean for which API Client to use
+V3 = False 
 LOG_TO_FILE = False
 LOG_FILE = "vae.log"
 SLEEP_MINUTES = 5
@@ -80,4 +84,3 @@ SYSLOG_PORT = 514
 SYSLOG_PROTO = "TCP"
 # Format: Standard or CEF
 SYSLOG_FORMAT = "CEF"
-# VERSION = None

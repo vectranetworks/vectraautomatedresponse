@@ -133,7 +133,8 @@ class VectraAccount:
 
     def _get_ldap(self):
         values = {}
-        if self._raw.get("ldap")["profiles"] != {}:
+
+        if self._raw.get("ldap") is not None:
             values["description"] = self._raw["description"]
             values["location"] = self._raw["location"]
             values["sam_account_name"] = self._raw["sAMAccountName"]
@@ -183,7 +184,8 @@ class VectraStaticIP:
 class VectraDetection:
     def __init__(self, detection):
         self.id = detection["id"]
-        self.host_id = detection["src_host"]["id"]
+        self.host_id = self._get_host_id(detection)
+        self.account_id = self._get_account_id(detection)
         self.category = detection["category"]
         self.detection_type = detection["detection_type"]
         self.src = detection["src_ip"]
@@ -196,6 +198,18 @@ class VectraDetection:
         self.triage = detection["triage_rule_id"]
         self.tags = self._get_external_tags(detection["tags"])
         self.blocked_elements = self._get_blocked_elements(detection["tags"])
+
+    def _get_host_id(self,detection):
+        if detection["src_host"] is not None:
+            return detection["src_host"]["id"]
+        else:
+            return None
+
+    def _get_account_id(self,detection):
+        if detection["src_account"] is not None:
+            return detection["src_account"]["id"]
+        else:
+            return None
 
     def _get_dst_ips(self, detection):
         dst_ips = set()

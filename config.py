@@ -1,7 +1,10 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = ""
-COGNITO_TOKEN = ""
+COGNITO_URL = "<brain_url>"
+COGNITO_TOKEN = "<token>"
+COGNITO_CLIENT_ID = "<client_id>"
+COGNITO_SECRET_KEY = "<secret_key>"
+V3 = False
 LOG_TO_FILE = False
 LOG_FILE = "var.log"
 SLEEP_MINUTES = 5
@@ -9,7 +12,7 @@ SLEEP_MINUTES = 5
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements']
-THIRD_PARTY_CLIENTS = ["test_client"]
+THIRD_PARTY_CLIENTS = ['cisco_ise']
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
