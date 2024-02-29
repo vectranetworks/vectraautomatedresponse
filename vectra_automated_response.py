@@ -162,8 +162,6 @@ class HTTPException(Exception):
         super().__init__(body)
 
 class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4):
-# class VectraClient(vectra.VectraClientV2_4):
-# class VectraClient(vectra.VectraSaaSClientV3_3):
     def __init__(
         self,
         url: Optional[str] = "",
