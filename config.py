@@ -12,7 +12,7 @@ SLEEP_MINUTES = 5
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements']
-THIRD_PARTY_CLIENTS = ['cisco_ise']
+THIRD_PARTY_CLIENTS = ['test_client']
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
