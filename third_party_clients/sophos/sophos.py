@@ -139,16 +139,4 @@ class Client(ThirdPartyInterface):
             _ = ipaddress.ip_address(ip)
             return True
         except ValueError:
-            return False            blocked_IPs = self._get_blocked_ips()
-            if ip in blocked_IPs:
-                blocked_IPs.remove(ip)
-                if self._update_blocked_ips(blocked_IPs):
-                    return [ip]
-        return []
-
-    def _validate_ip_address(self, ip: str):
-        try:
-            _ = ipaddress.ip_address(ip)
-            return True
-        except ValueError:
-            return False
+            return False  

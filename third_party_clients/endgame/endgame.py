@@ -118,14 +118,3 @@ class Client(ThirdPartyInterface):
         self.logger.warning("Endgame client does not implement static IP-blocking")
         return []
 
-    def unblock_account(self, account: VectraAccount) -> list:
-        self.logger.warning("Endgame client does not implement account blocking")
-        return []
-
-    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.warning("Endgame client does not implement static IP-blocking")
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.warning("Endgame client does not implement static IP-blocking")
-        return []

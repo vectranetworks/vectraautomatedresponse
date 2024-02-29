@@ -319,14 +319,3 @@ class Client(ThirdPartyInterface):
         json_response = result.json()
         return json_response
 
-        }
-
-        result = requests.post(
-            "{url}/incidents".format(url=self.url),
-            json=request,
-            verify=self.verify,
-            headers=self.authorization_header)
-
-        json_response = result.json()
-        return json_response
-

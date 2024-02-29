@@ -199,10 +199,4 @@ class Client(ThirdPartyInterface):
             task = vm_obj.ReconfigVM_Task(spec=spec)
             self.wait_for_tasks(si, [task])
         return True
-            dev_changes = []
-            dev_changes.append(virtual_nic_spec)
-            spec = vim.vm.ConfigSpec()
-            spec.deviceChange = dev_changes
-            task = vm_obj.ReconfigVM_Task(spec=spec)
-            self.wait_for_tasks(si, [task])
-        return True
+

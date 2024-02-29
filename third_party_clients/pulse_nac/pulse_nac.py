@@ -244,14 +244,4 @@ class Client(ThirdPartyInterface):
                                 verify=self.verify)
         return response
 
-        :param mac: MAC to unblock
-        :return:  reqeusts' response object
-        """
-        headers = {**self.headers, **{'Authorization': 'Basic ' + self.token.decode('utf-8')}}
-        body = json.dumps({
-            'event-name': 'clear-quarantined-endpoint',
-            'macaddr': '{}'.format(mac)
-        })
-        response = requests.put(self.urlbase + '/api/v1/integration/sessions', headers=headers, data=body,
-                                verify=self.verify)
-        return response
+

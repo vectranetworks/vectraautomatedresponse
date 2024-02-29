@@ -172,23 +172,4 @@ class Client(ThirdPartyInterface):
                 )
             )
             return []
-        r = requests.post(
-            url="{}/api/?type=user-id&action=set".format(firewall["url"]),
-            headers={"X-PAN-KEY": firewall["api_key"]},
-            files={"file": payload},
-            verify=self.verify,
-        )
-        if r.ok:
-            self.logger.info(
-                "Unregistered IP(s):{} with firewall {}".format(
-                    ip_addresses, firewall["url"]
-                )
-            )
-            return ip_addresses
-        else:
-            self.logger.info(
-                "Unable to unregistered IP(s):{} with firewall {}".format(
-                    ip_addresses, firewall["url"]
-                )
-            )
-            return []
+

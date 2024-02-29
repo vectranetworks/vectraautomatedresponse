@@ -55,8 +55,3 @@ class Client(ThirdPartyInterface):
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         return []
 
-    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        return []
