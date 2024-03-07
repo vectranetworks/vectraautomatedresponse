@@ -11,10 +11,12 @@ import sys
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional
+import warnings
 
 import keyring
 import requests
 import vat.vectra as vectra
+import saas
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -34,7 +36,7 @@ from config import (
     BLOCK_START_TIME,
     COGNITO_TOKEN,
     COGNITO_URL,
-    CLIENT_ID,
+    COGNITO_CLIENT_ID,
     DST_EMAIL,
     EXTERNAL_BLOCK_DETECTION_TAG,
     EXTERNAL_BLOCK_DETECTION_TYPES,
@@ -43,7 +45,7 @@ from config import (
     LOG_TO_FILE,
     NO_BLOCK_ACCOUNT_GROUP_NAME,
     NO_BLOCK_HOST_GROUP_NAME,
-    SECRET_KEY,
+    COGNITO_SECRET_KEY,
     SEND_EMAIL,
     SEND_SYSLOG,
     SLEEP_MINUTES,
@@ -68,6 +70,8 @@ from vectra_automated_response_consts import (
 )
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+warnings.filterwarnings('ignore', '.*', PendingDeprecationWarning)
 
 clients = {}
 for client in os.listdir("third_party_clients"):
@@ -104,6 +108,8 @@ if not Third_Party_Clients:
 HostDict = Dict[str, VectraHost]
 AccountDict = Dict[str, VectraAccount]
 DetectionDict = Dict[str, VectraDetection]
+
+# TODO decorate HTTP checks
 
 def log_conf(debug):
     if LOG_TO_FILE:
@@ -155,15 +161,13 @@ class HTTPException(Exception):
         body = f"Status code: {response.status_code} - {detail}"
         super().__init__(body)
 
-
-class VectraClient(vectra.VectraClientV2_4):
-# class VectraClient(vectra.VectraSaaSClientV3_3):
+class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4):
     def __init__(
         self,
-        url: Optional[str] = None,
-        token: Optional[str] = None,
-        #client_id: Optional[str] = None,
-        #secret_key: Optional[str] = None,
+        url: Optional[str] = "",
+        token: Optional[str] = "",
+        client_id: Optional[str] = "",
+        secret_key: Optional[str] = "",
         verify: bool = False,
     ) -> None:
         """
@@ -173,8 +177,11 @@ class VectraClient(vectra.VectraClientV2_4):
         :param token: API token for authentication - required
         :param verify: verify SSL - optional
         """
+        if V3:
         # super().__init__(url=url, token=token, client_id=client_id, secret_key=secret_key, verify=verify)
-        super().__init__(url=url, token=token, verify=verify)
+            super().__init__(url=url, client_id=client_id, secret_key=secret_key)
+        else:
+            super().__init__(url=url, token=token, verify=verify)
         self.logger = logging.getLogger("VectraClient")
 
     def get_account_by_uid(self, uid: str) -> list:
@@ -248,14 +255,14 @@ class VectraClient(vectra.VectraClientV2_4):
     def get_scored_hosts(self, tc_tuple) -> HostDict:
         """
         Get a dictionary of all hosts above given threat/certainty threshold
-        :param threat_gte: threat score threshold
-        :param certainty_gte: certainty score threshold
+        :param t_score_gte: threat score threshold
+        :param c_score_gte: certainty score threshold
         :rtype: HostDict
         """
         hosts = {}
         try:
-            threat_gte, condition, certainty_gte = tc_tuple
-            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
+            t_score_gte, condition, c_score_gte = tc_tuple
+            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
                 raise ValueError
             if condition not in ["and", "or"]:
                 raise ValueError
@@ -267,7 +274,8 @@ class VectraClient(vectra.VectraClientV2_4):
 
         if condition == "and":
             r = self.get_all_hosts(
-                threat_gte=threat_gte, certainty_gte=certainty_gte, all=True
+                # t_score_gte=t_score_gte, c_score_gte=c_score_gte, all=True
+                t_score_gte=t_score_gte, c_score_gte=c_score_gte
             )
             for page in r:
                 if page.status_code not in [200, 201, 204]:
@@ -275,13 +283,15 @@ class VectraClient(vectra.VectraClientV2_4):
                 for host in page.json().get("results", []):
                     hosts[host["id"]] = VectraHost(host)
         else:
-            r = self.get_all_hosts(threat_gte=threat_gte, all=True)
+            # r = self.get_all_hosts(t_score_gte=t_score_gte, all=True)
+            r = self.get_all_hosts(t_score_gte=t_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
                 for host in page.json().get("results", []):
                     hosts[host["id"]] = VectraHost(host)
-            r = self.get_all_hosts(certainty_gte=certainty_gte, all=True)
+            # r = self.get_all_hosts(c_score_gte=c_score_gte, all=True)
+            r = self.get_all_hosts(c_score_gte=c_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
@@ -293,14 +303,14 @@ class VectraClient(vectra.VectraClientV2_4):
     def get_scored_accounts(self, tc_tuple) -> AccountDict:
         """
         Get a dictionary of all accounts above given threat/certainty threshold
-        :param threat_gte: threat score threshold
-        :param certainty_gte: certainty score threshold
+        :param t_score_gte: threat score threshold
+        :param c_score_gte: certainty score threshold
         :rtype: AccountDict
         """
         accounts = {}
         try:
-            threat_gte, condition, certainty_gte = tc_tuple
-            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
+            t_score_gte, condition, c_score_gte = tc_tuple
+            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
                 raise ValueError
             if condition not in ["and", "or", "AND", "OR"]:
                 raise ValueError
@@ -310,17 +320,32 @@ class VectraClient(vectra.VectraClientV2_4):
             )
             exit(99)
 
-        r = self.advanced_search(
-            stype="accounts",
-            query="account.threat:>={} {} account.certainty:>={}".format(
-                threat_gte, condition, certainty_gte
-            ),
-        )
-        for page in r:
-            if page.status_code not in [200, 201, 204]:
-                raise HTTPException(page)
-            for account in page.json().get("results", []):
-                accounts[account["id"]] = VectraAccount(account)
+
+        if condition == "and":
+            r = self.get_all_accounts(
+                # t_score_gte=t_score_gte, c_score_gte=c_score_gte, all=True
+                t_score_gte=t_score_gte, c_score_gte=c_score_gte
+            )
+            for page in r:
+                if page.status_code not in [200, 201, 204]:
+                    raise HTTPException(page)
+                for account in page.json().get("results", []):
+                    accounts[account["id"]] = VectraAccount(account)
+        else:
+            # r = self.get_all_hosts(t_score_gte=t_score_gte, all=True)
+            r = self.get_all_accounts(t_score_gte=t_score_gte)
+            for page in r:
+                if page.status_code not in [200, 201, 204]:
+                    raise HTTPException(page)
+                for account in page.json().get("results", []):
+                    accounts[account["id"]] = VectraAccount(account)
+            # r = self.get_all_hosts(c_score_gte=c_score_gte, all=True)
+            r = self.get_all_accounts(c_score_gte=c_score_gte)
+            for page in r:
+                if page.status_code not in [200, 201, 204]:
+                    raise HTTPException(page)
+                for account in page.json().get("results", []):
+                    accounts[account["id"]] = VectraAccount(account)
 
         return accounts
 
@@ -331,7 +356,8 @@ class VectraClient(vectra.VectraClientV2_4):
         :rtype: HostDict
         """
         hosts = {}
-        r = self.get_all_hosts(tags=tag, all=True)
+        # r = self.get_all_hosts(tags=tag, all=True)
+        r = self.get_all_hosts(tags=tag)
         for page in r:
             if page.status_code not in [200, 201, 204]:
                 raise HTTPException(page)
@@ -346,9 +372,8 @@ class VectraClient(vectra.VectraClientV2_4):
         :rtype: AccountDict
         """
         accounts = {}
-        r = self.advanced_search(
-            stype="accounts", query='account.tags:"{}"'.format(tag)
-        )
+
+        r = self.get_all_accounts(tags=tag)
         for page in r:
             if page.status_code not in [200, 201, 204]:
                 raise HTTPException(page)
@@ -367,11 +392,11 @@ class VectraClient(vectra.VectraClientV2_4):
         hosts = {}
         try:
             (
-                threat_gte,
+                t_score_gte,
                 condition,
-                certainty_gte,
+                c_score_gte,
             ) = block_host_detections_types_min_host_tc
-            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
+            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
                 raise ValueError
             if condition not in ["and", "or"]:
                 raise ValueError
@@ -386,10 +411,10 @@ class VectraClient(vectra.VectraClientV2_4):
             host_id = detection["src_host"]["id"]
             host = self.get_host_by_id(host_id=host_id).json()
             if condition == "and":
-                if host["threat"] > threat_gte and host["certainty"] > certainty_gte:
+                if host["threat"] > t_score_gte and host["certainty"] > c_score_gte:
                     hosts[host["id"]] = VectraHost(host)
             elif condition == "or":
-                if host["threat"] > threat_gte or host["certainty"] > certainty_gte:
+                if host["threat"] > t_score_gte or host["certainty"] > c_score_gte:
                     hosts[host["id"]] = VectraHost(host)
             else:
                 continue
@@ -408,11 +433,11 @@ class VectraClient(vectra.VectraClientV2_4):
         accounts = {}
         try:
             (
-                threat_gte,
+                t_score_gte,
                 condition,
-                certainty_gte,
+                c_score_gte,
             ) = block_account_detections_types_min_account_tc
-            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
+            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
                 raise ValueError
             if condition not in ["and", "or"]:
                 raise ValueError
@@ -428,14 +453,14 @@ class VectraClient(vectra.VectraClientV2_4):
             account = self.get_account_by_id(account_id=account_id).json()
             if condition == "and":
                 if (
-                    account["threat"] > threat_gte
-                    and account["certainty"] > certainty_gte
+                    account["threat"] > t_score_gte
+                    and account["certainty"] > c_score_gte
                 ):
                     accounts[account["id"]] = VectraAccount(account)
             elif condition == "or":
                 if (
-                    account["threat"] > threat_gte
-                    or account["certainty"] > certainty_gte
+                    account["threat"] > t_score_gte
+                    or account["certainty"] > c_score_gte
                 ):
                     accounts[account["id"]] = VectraAccount(account)
             else:
@@ -662,8 +687,8 @@ class VectraClient(vectra.VectraClientV2_4):
     def get_detections_on_scored_host(self, min_host_tc_score: tuple) -> DetectionDict:
         """
         Get a dictionary of all detections present on hosts exceeding the threat/certainty threshold..
-        :param host_threat_gte: min threat score of hosts to match
-        :param host_certainty_gte: min certainty score of hosts to match
+        :param host_t_score_gte: min threat score of hosts to match
+        :param host_c_score_gte: min certainty score of hosts to match
         :rtype: DetectionDict
         """
         detections = {}
@@ -1655,10 +1680,11 @@ def main():
             )
     else:
         if V3:
+            # TODO fix positional arguments
             vectra_api_client = VectraClient(
                 url=COGNITO_URL, 
-                client_id=CLIENT_ID, 
-                secret_key=SECRET_KEY
+                client_id=COGNITO_CLIENT_ID, 
+                secret_key=COGNITO_SECRET_KEY
             )
         else:
             vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
