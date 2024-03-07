@@ -251,14 +251,4 @@ class Client(ThirdPartyInterface):
         # this client only implements Host-based blocking
         self.logger.warning(
             'WithSecure client does not implement destination IP blocking')
-        return []    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        self.logger.warning(
-            'WithSecure client does not implement destination IP blocking')
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        self.logger.warning(
-            'WithSecure client does not implement destination IP blocking')
-        return []
+        return [] 

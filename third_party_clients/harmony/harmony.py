@@ -32,11 +32,4 @@ class Client(ThirdPartyInterface):
         self.company_id = self._get_company_id()
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
-        encoded_user_pass_sequence = str(encoded_bytes, "utf-8")
-        self.authorization_header = {
-            "Authorization": "Basic " + encoded_user_pass_sequence,
-            "Content-Type": "application/json",
-        }
-        self.company_id = self._get_company_id()
-        # Instantiate parent class
-        ThirdPartyInterface.__init__(self)
+

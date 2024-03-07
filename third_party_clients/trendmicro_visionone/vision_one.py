@@ -221,15 +221,4 @@ class Client(ThirdPartyInterface):
             "CloudOne client does not implement destination IP blocking"
         )
         return []
-        # this client only implements Host-based blocking
-        self.logger.warning(
-            "CloudOne client does not implement destination IP blocking"
-        )
-        return []
 
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        self.logger.warning(
-            "CloudOne client does not implement destination IP blocking"
-        )
-        return []

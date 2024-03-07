@@ -128,16 +128,3 @@ class Client(ThirdPartyInterface):
         disconnect_url = "{url}/session-action/disconnect/mac/{mac_address}?async=false".format(url=self.url, mac_address=mac_address)
         disconnect = requests.post(url=disconnect_url, headers=self.bearer, verify=self.verify)
         disconnect.raise_for_status()
-                "isolated": isolated
-            }
-        }
-        r = requests.patch(url=patch_endpoint_url, headers=self.bearer, verify=self.verify, json=params_patch_endpoint)
-        r.raise_for_status()
-
-    def _disconnect_session(self, mac_address):
-        """ 
-        Disconnects host session 
-        """
-        disconnect_url = "{url}/session-action/disconnect/mac/{mac_address}?async=false".format(url=self.url, mac_address=mac_address)
-        disconnect = requests.post(url=disconnect_url, headers=self.bearer, verify=self.verify)
-        disconnect.raise_for_status()

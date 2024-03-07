@@ -140,14 +140,3 @@ class Client(ThirdPartyInterface):
         # token = jwt.encode(payload, API_KEY, algorithm='HS256').decode('utf-8')
         token = jwt.encode(payload, API_KEY, algorithm='HS256')
         return token
-            str.encode(string_to_hash)).digest()).decode('utf-8')
-        return base64_string
-
-    def create_jwt_token(self, request_body):
-        payload = {'appid': APPLICATION_ID,
-                   'iat': time.time(),
-                   'version': 'V1',
-                   'checksum': self.create_checksum('POST', API_PATH, "", request_body)}
-        # token = jwt.encode(payload, API_KEY, algorithm='HS256').decode('utf-8')
-        token = jwt.encode(payload, API_KEY, algorithm='HS256')
-        return token

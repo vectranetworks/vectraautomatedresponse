@@ -324,14 +324,4 @@ class Client(ThirdPartyInterface):
         r = firewall.update_address_group(group_name, member_list)
         if r.status_code == 500:
             raise HTTPError("Could not update group {}".format(group_name))
-        member_list = group.json()["results"][0]["member"]
-        if append:
-            member_list.append({"name": ip_address})
-        else:
-            for member in member_list:
-                if member.get("name") == ip_address:
-                    member_list.remove(member)
-                    break
-        r = firewall.update_address_group(group_name, member_list)
-        if r.status_code == 500:
-            raise HTTPError("Could not update group {}".format(group_name))
+

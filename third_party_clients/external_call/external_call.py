@@ -126,14 +126,4 @@ class Client(ThirdPartyInterface):
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         self.logger.info('external_call block static destination IP not configured.')
-        return []        else:
-            self.logger.info('external_call unblock_detection not configured.')
-            return []
-
-    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.info('external_call block static destination IP not configured.')
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.info('external_call block static destination IP not configured.')
-        return []
+        return []     
