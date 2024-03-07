@@ -200,16 +200,10 @@ class VectraDetection:
         self.blocked_elements = self._get_blocked_elements(detection["tags"])
 
     def _get_host_id(self,detection):
-        if detection["src_host"] is not None:
-            return detection["src_host"]["id"]
-        else:
-            return None
+        return detection.get("src_host", {}).get("id")
 
     def _get_account_id(self,detection):
-        if detection["src_account"] is not None:
-            return detection["src_account"]["id"]
-        else:
-            return None
+        return detection.get("src_account", {}).get("id")
 
     def _get_dst_ips(self, detection):
         dst_ips = set()
