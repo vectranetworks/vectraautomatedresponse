@@ -386,8 +386,7 @@ class Client(ThirdPartyInterface):
         Obtains client by client ID
         :param network_id: client's network id
         :param client_id: client's id
-        :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}, if 404:
-        {"errors": ["Client not found"]})
+        :return: requests response
         """
         if network_id and client_id:
             result = requests.get(
@@ -405,7 +404,7 @@ class Client(ThirdPartyInterface):
         Obtains clients policy
         :param network_id: client's network id
         :param client_id: client's id
-        :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}
+        :return: requests response
         """
         if network_id and client_id:
             result = requests.get(
@@ -522,7 +521,6 @@ class Client(ThirdPartyInterface):
         Block client by updating client's policy to 'Block'.
 
         :param client: Client object
-        # {'id': 'kcd012f', 'net_id': 'N_644014746713985158', 'mac': '30:24:a9:96:b9:b4', 'description': 'BEDENNB131'}
         :return:  request's response object
         """
         # https://developer.cisco.com/meraki/api-latest/#!update-network-client-policy
