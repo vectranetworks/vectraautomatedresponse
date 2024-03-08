@@ -12,7 +12,7 @@ from third_party_clients.third_party_interface import (
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "Windows Shutdown Client"
         # Instantiate parent class
         self.logger = logging.getLogger()
@@ -28,7 +28,7 @@ class Client(ThirdPartyInterface):
         return [host_name]
 
     def unblock_host(self, host):
-        self.logger.warn("Cient cannot restart a machine automatically")
+        self.logger.warn("Client cannot restart a machine automatically")
         return host.blocked_elements.get(self.__class__.__name__)
 
     def groom_host(self, host) -> dict:
@@ -54,4 +54,3 @@ class Client(ThirdPartyInterface):
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         return []
-

@@ -5,7 +5,7 @@ import keyring
 import requests
 import urllib3
 from third_party_clients.meraki.meraki_config import (
-    API_KEY,
+    # API_KEY,
     BLOCK_GROUP_POLICY,
     BLOCK_INACTIVE_CLIENTS,
     BLOCK_MULTIPLE_IP,
@@ -22,6 +22,8 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
+from vectra_automated_response import _get_password
+
 urllib3.disable_warnings()
 
 
@@ -36,96 +38,147 @@ class Client(ThirdPartyInterface):
         Obtains list of organization IDs from Meraki API
         :return: list of organization IDs
         """
-        results = requests.get(urlbase + '/organizations', headers=headers, verify=verify)
+        results = requests.get(
+            urlbase + "/organizations", headers=headers, verify=verify
+        )
         if results.ok:
-            return [org.get('id') for org in results.json()]
+            return [org.get("id") for org in results.json()]
         else:
-            logger.error('Unable to retrieve organizations for Meraki API.  Error message:{}'.format(results.reason))
+            logger.error(
+                "Unable to retrieve organizations for Meraki API.  Error message:{}".format(
+                    results.reason
+                )
+            )
             return []
 
     def get_network_devices(self) -> dict:
         network_inv_list = []
         for org in self.orgs:
-            r = requests.get(self.urlbase + '/organizations/{}/devices/availabilities'.format(org),
-                             headers=self.headers, verify=self.verify)
+            r = requests.get(
+                self.urlbase + "/organizations/{}/devices/availabilities".format(org),
+                headers=self.headers,
+                verify=self.verify,
+            )
             if r.ok:
                 network_inv_list += r.json()
-        self.logger.debug('network_inv_list: {}'.format(network_inv_list))
+        self.logger.debug("network_inv_list: {}".format(network_inv_list))
         if len(network_inv_list) > 0:
             network_inv_dict = {}
             for i in network_inv_list:
-                network_inv_dict[i.get('mac')] = {'name': i.get('name'), 'product_type': i.get('productType'),
-                                                  'serial': i.get('serial')}
+                network_inv_dict[i.get("mac")] = {
+                    "name": i.get("name"),
+                    "product_type": i.get("productType"),
+                    "serial": i.get("serial"),
+                }
             return network_inv_dict
         else:
             return {}
 
-    def __init__(self, use_keyring):
+    def __init__(self, **kwargs):
         self.name("Meraki Client")
-        self.urlbase = MERAKI_URL.strip('/')
-        if not use_keyring:
-            self.token = API_KEY
-        else:
-            self.token = keyring.get_password('VAE', 'Meraki')
-        self.headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + self.token}
-        self.logger = logging.getLogger('Meraki')
+        self.urlbase = MERAKI_URL.strip("/")
+        self.token = _get_password("Meraki", "API_Key", modify=kwargs["modify"])
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + self.token,
+        }
+        self.logger = logging.getLogger("Meraki")
         self.verify = VERIFY
         self.multi_ip = BLOCK_MULTIPLE_IP
         self.multi_mac = BLOCK_MULTIPLE_MAC
         self.orgs = self.get_orgs(self.urlbase, self.headers, self.verify, self.logger)
-        self.block_policy = BLOCK_GROUP_POLICY if bool(BLOCK_GROUP_POLICY) else 'Blocked'
+        self.block_policy = (
+            BLOCK_GROUP_POLICY if bool(BLOCK_GROUP_POLICY) else "Blocked"
+        )
         self.network_device_inventory = self.get_network_devices()
-        self.port_schedule_name = PORT_SCHEDULE if bool(PORT_SCHEDULE) else 'Blocked'
+        self.port_schedule_name = PORT_SCHEDULE if bool(PORT_SCHEDULE) else "Blocked"
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
     def block_host(self, host):
         # if host.ip == '192.168.0.209':
         #     host.mac_addresses = ['30:24:a9:96:b9:b4', 'a4:97:b1:5e:79:1f']
-        self.logger.info('Meraki host block request for:{}:{}'.format(host.ip, host.mac_addresses))
+        self.logger.info(
+            "Meraki host block request for:{}:{}".format(host.ip, host.mac_addresses)
+        )
         # Retrieve client_id
         # [{'id': 'kcd012f', 'net_id': 'N_644014746713985158', 'mac': '30:24:a9:96:b9:b4', 'description': 'BEDENNB131'}]
 
-        client_list = self._get_client_id(host.ip, host.mac_addresses, host.last_seen_ts_utc)
+        client_list = self._get_client_id(
+            host.ip, host.mac_addresses, host.last_seen_ts_utc
+        )
         if len(client_list) < 1:
-            self.logger.info('Unable to find client ID for:{}:{}, not blocking.'.format(host.ip, host.mac_addresses))
+            self.logger.info(
+                "Unable to find client ID for:{}:{}, not blocking.".format(
+                    host.ip, host.mac_addresses
+                )
+            )
             return []
         if len(client_list) > 1 and not (self.multi_mac or self.multi_mac):
-            self.logger.info('More than 1 client found for:{}:{}, and multi-blocking not allowed. \
-                             Not blocking.'.format(host.ip, host.mac_addresses))
+            self.logger.info(
+                "More than 1 client found for:{}:{}, and multi-blocking not allowed. \
+                             Not blocking.".format(
+                    host.ip, host.mac_addresses
+                )
+            )
             return []
-        if len(client_list) == 1 or (len(client_list) > 1 and (self.multi_mac or self.multi_mac)):
+        if len(client_list) == 1 or (
+            len(client_list) > 1 and (self.multi_mac or self.multi_mac)
+        ):
             blocked_list = []
-            self.logger.info('{} Client(s) found for:{}, iterating.'.format(len(client_list), host.name))
+            self.logger.info(
+                "{} Client(s) found for:{}, iterating.".format(
+                    len(client_list), host.name
+                )
+            )
             for client in client_list:
-                self.logger.info('Client(s) found for:{}:{}, blocking.'.format(host.ip, client['id']))
+                self.logger.info(
+                    "Client(s) found for:{}:{}, blocking.".format(host.ip, client["id"])
+                )
                 # Determine connection type and if host is blockable
                 conn_type, blockable = self._get_block_type(client)
                 if blockable:
-                    if conn_type == 'WLAN':
+                    if conn_type == "WLAN":
                         # Get policy to store for unblocking request
-                        client_policy = self._get_client_policy(client['net_id'], client['id'])
+                        client_policy = self._get_client_policy(
+                            client["net_id"], client["id"]
+                        )
                         if client_policy.ok:
                             policy_obj = client_policy.json()
-                            self.logger.debug('Retrieved clients current policy object: {}'.format(policy_obj))
+                            self.logger.debug(
+                                "Retrieved clients current policy object: {}".format(
+                                    policy_obj
+                                )
+                            )
                         else:
                             # Unable to retrieve policy object
-                            self.logger.error('Unable to retrieve policy object for client: {}'.format(client['id']))
+                            self.logger.error(
+                                "Unable to retrieve policy object for client: {}".format(
+                                    client["id"]
+                                )
+                            )
                         # attempt to block
                         res = self._block_client(client)
                         if res.ok:
-                            self.logger.info('Client {} with ID {} successfully blocked.'.format(
-                                client['description'],
-                                client['id']
-                            ))
-                            blocked_list.append('WLAN:{}:{}:{}'.format(
-                                client['id'],
-                                client['net_id'],
-                                policy_obj['devicePolicy']
-                            ))
+                            self.logger.info(
+                                "Client {} with ID {} successfully blocked.".format(
+                                    client["description"], client["id"]
+                                )
+                            )
+                            blocked_list.append(
+                                "WLAN:{}:{}:{}".format(
+                                    client["id"],
+                                    client["net_id"],
+                                    policy_obj["devicePolicy"],
+                                )
+                            )
                         else:
-                            self.logger.info('Error blocking client.  Error message: {}.'.format(res.reason))
-                    elif conn_type == 'switch':
+                            self.logger.info(
+                                "Error blocking client.  Error message: {}.".format(
+                                    res.reason
+                                )
+                            )
+                    elif conn_type == "switch":
                         # 'switch' (wired), Call method to change schedule on port
                         # orig_scheduler_id = self._get_switch_port_schedule(
                         #     switch_sn=client.get('recentDeviceSerial'),
@@ -146,74 +199,114 @@ class Client(ThirdPartyInterface):
                         #         client.get('switchport'),
                         #         orig_scheduler_id
                         #     ))
-                        self.logger.info('Attempting to disable port {} on switch {}'.format(
-                            client.get('switchport'), client.get('recentDeviceSerial')
-                        ))
+                        self.logger.info(
+                            "Attempting to disable port {} on switch {}".format(
+                                client.get("switchport"),
+                                client.get("recentDeviceSerial"),
+                            )
+                        )
                         res = self._set_switchport_state(
-                            switch_sn=client.get('recentDeviceSerial'),
-                            port=client.get('switchport'),
-                            state=False
+                            switch_sn=client.get("recentDeviceSerial"),
+                            port=client.get("switchport"),
+                            state=False,
                         )
                         if res.ok:
-                            self.logger.info('Disabled port {} on switch {} for client {}'.format(
-                                client.get('switchport'), client.get('recentDeviceSerial'), client['id']
-                            ))
-                            blocked_list.append('LAN:{}:{}:{}'.format(
-                                client['id'],
-                                client.get('recentDeviceSerial'),
-                                client.get('switchport')
-                            ))
+                            self.logger.info(
+                                "Disabled port {} on switch {} for client {}".format(
+                                    client.get("switchport"),
+                                    client.get("recentDeviceSerial"),
+                                    client["id"],
+                                )
+                            )
+                            blocked_list.append(
+                                "LAN:{}:{}:{}".format(
+                                    client["id"],
+                                    client.get("recentDeviceSerial"),
+                                    client.get("switchport"),
+                                )
+                            )
                         else:
-                            self.logger.info('Unable to set port enable status: {}.'.format(res.content))
+                            self.logger.info(
+                                "Unable to set port enable status: {}.".format(
+                                    res.content
+                                )
+                            )
                 else:
-                    self.logger.info('{} attached host {} not blockable'.format(conn_type, client['id']))
+                    self.logger.info(
+                        "{} attached host {} not blockable".format(
+                            conn_type, client["id"]
+                        )
+                    )
             return blocked_list
 
     def unblock_host(self, host):
         blocked_elements = host.blocked_elements.get(self.__class__.__name__, [])
         unblocked_elements = []
         for client_network in blocked_elements:
-            self.logger.debug('client_network from tag:{}'.format(client_network))
-            net_type = client_network.split(':')[0]
+            self.logger.debug("client_network from tag:{}".format(client_network))
+            net_type = client_network.split(":")[0]
 
             if net_type == "WLAN":
-                client_id = client_network.split(':')[1]
-                network_id = client_network.split(':')[2]
-                device_policy = client_network.split(':')[3]
-                self.logger.debug('Meraki {} host unblock request for host:{} client:{}, network:{}, policy:{}'.format(
-                    net_type, host.name, client_id, network_id, device_policy))
+                client_id = client_network.split(":")[1]
+                network_id = client_network.split(":")[2]
+                device_policy = client_network.split(":")[3]
+                self.logger.debug(
+                    "Meraki {} host unblock request for host:{} client:{}, network:{}, policy:{}".format(
+                        net_type, host.name, client_id, network_id, device_policy
+                    )
+                )
                 res = self._unblock_client(client_id, network_id, device_policy)
                 if res.ok:
-                    self.logger.debug('Meraki host unblock request successful for host:{} client:{}, network:{}, '
-                                      'policy:{}'.format(host.name, client_id, network_id, device_policy))
+                    self.logger.debug(
+                        "Meraki host unblock request successful for host:{} client:{}, network:{}, "
+                        "policy:{}".format(
+                            host.name, client_id, network_id, device_policy
+                        )
+                    )
                     unblocked_elements.append(client_network)
                 else:
-                    self.logger.debug('Meraki host unblock request unsuccessful for host:{} client:{}, network:{}, '
-                                      'policy:{}'.format(host.name, client_id, network_id, device_policy))
+                    self.logger.debug(
+                        "Meraki host unblock request unsuccessful for host:{} client:{}, network:{}, "
+                        "policy:{}".format(
+                            host.name, client_id, network_id, device_policy
+                        )
+                    )
                     unblocked_elements.append(client_network)
             else:
-                client_id = client_network.split(':')[1]
-                switch_sn = client_network.split(':')[2]
-                switch_port = client_network.split(':')[3]
+                client_id = client_network.split(":")[1]
+                switch_sn = client_network.split(":")[2]
+                switch_port = client_network.split(":")[3]
                 # scheduler_id = client_network.split(':')[4] if client_network.split(':')[4] != 'No_Scheduler' \
                 #     else None
                 self.logger.debug(
-                    'Meraki {} host unblock request for host:{} client:{}, switch_sn:{}, switch_port:{}'.format(
-                        net_type, host.name, client_id, switch_sn, switch_port))
+                    "Meraki {} host unblock request for host:{} client:{}, switch_sn:{}, switch_port:{}".format(
+                        net_type, host.name, client_id, switch_sn, switch_port
+                    )
+                )
                 # results = self._set_switchport_scheduler(switch_sn, switch_port, scheduler_id)
-                results = self._set_switchport_state(switch_sn=switch_sn, port=switch_port, state=True)
+                results = self._set_switchport_state(
+                    switch_sn=switch_sn, port=switch_port, state=True
+                )
                 if results.ok:
                     self.logger.info(
-                        'Meraki {} host unblock successful for host:{} client:{}, switch_sn:{}, switch_port:{}'.format(
-                            net_type, host.name, client_id, switch_sn, switch_port))
+                        "Meraki {} host unblock successful for host:{} client:{}, switch_sn:{}, switch_port:{}".format(
+                            net_type, host.name, client_id, switch_sn, switch_port
+                        )
+                    )
                     # unblocked_elements.append(scheduler_id)
                     unblocked_elements.append(client_network)
                 else:
                     self.logger.info(
-                        'Meraki {} host unblock unsuccessful for host:{} client:{}, switch_sn:{}, switch_port:{}, \
-                         {}'.format(
-                            net_type, host.name, client_id, switch_sn, switch_port, results.content
-                        ))
+                        "Meraki {} host unblock unsuccessful for host:{} client:{}, switch_sn:{}, switch_port:{}, \
+                         {}".format(
+                            net_type,
+                            host.name,
+                            client_id,
+                            switch_sn,
+                            switch_port,
+                            results.content,
+                        )
+                    )
         return unblocked_elements
 
     def groom_host(self, host) -> dict:
@@ -222,46 +315,54 @@ class Client(ThirdPartyInterface):
         :param host: Vectra host object
         :return: return {'block': host, 'unblock': host.blocked_elements}
         """
-        self.logger.info('Groom host called.  Host tags: {}'.format(host.blocked_elements))
-        meraki_blocked_elements = host.blocked_elements.get('MerakiClient')
+        self.logger.info(
+            "Groom host called.  Host tags: {}".format(host.blocked_elements)
+        )
+        meraki_blocked_elements = host.blocked_elements.get("MerakiClient")
         if meraki_blocked_elements:
-            clients_list = self._get_client_id(host.ip, host.mac_addresses, host.last_seen_ts_utc)
+            clients_list = self._get_client_id(
+                host.ip, host.mac_addresses, host.last_seen_ts_utc
+            )
             for element in meraki_blocked_elements:
-                if element.split(':')[0] in clients_list:
+                if element.split(":")[0] in clients_list:
                     # Client found by blocked ClientID, don't do anything
-                    self.logger.info('Host grooming client still active, doing nothing.')
-                    return {'block': False, 'unblock': False}
+                    self.logger.info(
+                        "Host grooming client still active, doing nothing."
+                    )
+                    return {"block": False, "unblock": False}
                 else:
                     # Client not found, return host object to be blocked, return blocked_elements to unblock
-                    self.logger.info('Host grooming client not found, requesting original client to unblock and current'
-                                     ' client to block.')
-                    return {'block': True, 'unblock': True}
+                    self.logger.info(
+                        "Host grooming client not found, requesting original client to unblock and current"
+                        " client to block."
+                    )
+                    return {"block": True, "unblock": True}
         else:
             # No Meraki blocked elements
-            return {'block': False, 'unblock': False}
+            return {"block": False, "unblock": False}
 
     def block_detection(self, detection):
-        self.logger.warning('Meraki client does not implement detection-based blocking')
+        self.logger.warning("Meraki client does not implement detection-based blocking")
         return []
 
     def unblock_detection(self, detection):
-        self.logger.warning('Meraki client does not implement detection-based blocking')
+        self.logger.warning("Meraki client does not implement detection-based blocking")
         return []
 
     def block_account(self, account: VectraAccount) -> list:
-        self.logger.warning('Meraki client does not implement account-based blocking')
+        self.logger.warning("Meraki client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
-        self.logger.warning('Meraki client does not implement account-based blocking')
+        self.logger.warning("Meraki client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.warning('Meraki client does not implement stati IP-based blocking')
+        self.logger.warning("Meraki client does not implement static IP-based blocking")
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.warning('Meraki client does not implement static IP-based blocking')
+        self.logger.warning("Meraki client does not implement static IP-based blocking")
         return []
 
     def _get_networks(self):
@@ -272,23 +373,30 @@ class Client(ThirdPartyInterface):
         networks = []
         for org in self.orgs:
             result = None
-            result = requests.get(url=self.urlbase + '/organizations/{}/networks/'.format(org), headers=self.headers,
-                                  verify=self.verify)
+            result = requests.get(
+                url=self.urlbase + "/organizations/{}/networks/".format(org),
+                headers=self.headers,
+                verify=self.verify,
+            )
             for item in result.json():
-                networks.append(item.get('id'))
+                networks.append(item.get("id"))
         return networks
 
     def _get_client(self, network_id, client_id):
         """
-                Obtains client by client ID
-                :param network_id: client's network id
-                :param client_id: client's id
-                :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}, if 404:
-                {"errors": ["Client not found"]})
-                """
+        Obtains client by client ID
+        :param network_id: client's network id
+        :param client_id: client's id
+        :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}, if 404:
+        {"errors": ["Client not found"]})
+        """
         if network_id and client_id:
-            result = requests.get(url=self.urlbase + '/networks/{}/clients/{}'.format(network_id, client_id),
-                                  headers=self.headers, verify=self.verify)
+            result = requests.get(
+                url=self.urlbase
+                + "/networks/{}/clients/{}".format(network_id, client_id),
+                headers=self.headers,
+                verify=self.verify,
+            )
             return result
         else:
             return None
@@ -301,8 +409,12 @@ class Client(ThirdPartyInterface):
         :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}
         """
         if network_id and client_id:
-            result = requests.get(url=self.urlbase + '/networks/{}/clients/{}/policy'.format(network_id, client_id),
-                                  headers=self.headers, verify=self.verify)
+            result = requests.get(
+                url=self.urlbase
+                + "/networks/{}/clients/{}/policy".format(network_id, client_id),
+                headers=self.headers,
+                verify=self.verify,
+            )
             return result
         else:
             return None
@@ -323,44 +435,86 @@ class Client(ThirdPartyInterface):
         if len(macs) == 1 or (len(macs) > 1 and self.multi_mac):
             for net_id in networks:
                 for mac in macs:
-                    self.logger.debug('Searching based on MAC: {}'.format(mac))
+                    self.logger.debug("Searching based on MAC: {}".format(mac))
                     # Search for host with MAC address starting 7 days prior to Detect's last_seen time for host
-                    params = {'mac': mac, 't0': last_seen - 604800}
-                    result = requests.get(url=self.urlbase + '/networks/{}/clients'.format(net_id), headers=self.headers,
-                                          params=params, verify=self.verify)
+                    params = {"mac": mac, "t0": last_seen - 604800}
+                    result = requests.get(
+                        url=self.urlbase + "/networks/{}/clients".format(net_id),
+                        headers=self.headers,
+                        params=params,
+                        verify=self.verify,
+                    )
                     if result.ok:
                         if len(result.json()) > 0:
-                            self.logger.debug('Found client(s) based on MAC.{}, {}'.format(mac, result.json()))
+                            self.logger.debug(
+                                "Found client(s) based on MAC.{}, {}".format(
+                                    mac, result.json()
+                                )
+                            )
                             ret_list += [
                                 {
-                                    'id': i['id'], 'net_id': net_id, 'mac': i['mac'], 'description': i['description'],
-                                    'switchport': i.get('switchport'), 'recentDeviceMac': i.get('recentDeviceMac'),
-                                    'recentDeviceSerial': i.get('recentDeviceSerial'), 'ssid': i.get('ssid'),
-                                    'status': i.get('status'), 'recentDeviceConnection': i.get('recentDeviceConnection')
+                                    "id": i["id"],
+                                    "net_id": net_id,
+                                    "mac": i["mac"],
+                                    "description": i["description"],
+                                    "switchport": i.get("switchport"),
+                                    "recentDeviceMac": i.get("recentDeviceMac"),
+                                    "recentDeviceSerial": i.get("recentDeviceSerial"),
+                                    "ssid": i.get("ssid"),
+                                    "status": i.get("status"),
+                                    "recentDeviceConnection": i.get(
+                                        "recentDeviceConnection"
+                                    ),
                                 }
-                                for i in result.json()]
+                                for i in result.json()
+                            ]
                     else:
-                        self.logger.error('Unable to search via MAC address: {}'.format(result.content))
+                        self.logger.error(
+                            "Unable to search via MAC address: {}".format(
+                                result.content
+                            )
+                        )
         elif len(ret_list) < 1:
             for net_id in networks:
-                params = {'ip': ip, 't0': last_seen - 604800}
-                result = requests.get(url=self.urlbase + '/networks/{}/clients'.format(net_id), headers=self.headers,
-                                      params=params, verify=self.verify)
+                params = {"ip": ip, "t0": last_seen - 604800}
+                result = requests.get(
+                    url=self.urlbase + "/networks/{}/clients".format(net_id),
+                    headers=self.headers,
+                    params=params,
+                    verify=self.verify,
+                )
                 if result.ok:
-                    if len(result.json()) == 1 or (len(result.json()) > 1 and self.multi_ip):
+                    if len(result.json()) == 1 or (
+                        len(result.json()) > 1 and self.multi_ip
+                    ):
                         ret_list += [
                             {
-                                'id': i['id'], 'net_id': net_id, 'mac': i['mac'], 'description': i['description'],
-                                'switchport': i.get('switchport'), 'recentDeviceMac': i.get('recentDeviceMac'),
-                                'recentDeviceSerial': i.get('recentDeviceSerial'), 'ssid': i.get('ssid'),
-                                'status': i.get('status'), 'recentDeviceConnection': i.get('recentDeviceConnection')
+                                "id": i["id"],
+                                "net_id": net_id,
+                                "mac": i["mac"],
+                                "description": i["description"],
+                                "switchport": i.get("switchport"),
+                                "recentDeviceMac": i.get("recentDeviceMac"),
+                                "recentDeviceSerial": i.get("recentDeviceSerial"),
+                                "ssid": i.get("ssid"),
+                                "status": i.get("status"),
+                                "recentDeviceConnection": i.get(
+                                    "recentDeviceConnection"
+                                ),
                             }
-                            for i in result.json()]
+                            for i in result.json()
+                        ]
                     else:
-                        self.logger.info('Search by IP {} returned {} clients, no clients found or \
-                                         multiple clients not allowed.'.format(ip, len(result.json())))
+                        self.logger.info(
+                            "Search by IP {} returned {} clients, no clients found or \
+                                         multiple clients not allowed.".format(
+                                ip, len(result.json())
+                            )
+                        )
                 else:
-                    self.logger.error('Unable to search via IP address: {}'.format(result.content))
+                    self.logger.error(
+                        "Unable to search via IP address: {}".format(result.content)
+                    )
 
         return ret_list
 
@@ -374,11 +528,17 @@ class Client(ThirdPartyInterface):
         """
         # https://developer.cisco.com/meraki/api-latest/#!update-network-client-policy
         body = {"devicePolicy": self.block_policy}
-        self.logger.debug('Device block policy: {}'.format(body))
-        response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(
-            client.get('net_id'), client.get('id')), headers=self.headers, data=json.dumps(body), verify=self.verify
-                                )
-        self.logger.debug('Block request response: {}'.format(response.text))
+        self.logger.debug("Device block policy: {}".format(body))
+        response = requests.put(
+            self.urlbase
+            + "/networks/{}/clients/{}/policy".format(
+                client.get("net_id"), client.get("id")
+            ),
+            headers=self.headers,
+            data=json.dumps(body),
+            verify=self.verify,
+        )
+        self.logger.debug("Block request response: {}".format(response.text))
         return response
 
     def _unblock_client(self, client_id, net_id, policy_id):
@@ -391,8 +551,12 @@ class Client(ThirdPartyInterface):
         """
         # body = {"devicePolicy": "Normal"}
         body = {"devicePolicy": policy_id}
-        response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(net_id, client_id),
-                                headers=self.headers, data=json.dumps(body), verify=self.verify)
+        response = requests.put(
+            self.urlbase + "/networks/{}/clients/{}/policy".format(net_id, client_id),
+            headers=self.headers,
+            data=json.dumps(body),
+            verify=self.verify,
+        )
         return response
 
     def _set_switchport_scheduler(self, switch_sn, port, scheduler_id=None):
@@ -404,10 +568,12 @@ class Client(ThirdPartyInterface):
         :return:
         """
         body = {"portScheduleId": scheduler_id}
-        results = requests.put(self.urlbase + '/devices/{}/switch/ports/{}'.format(switch_sn, port),
-                               headers=self.headers,
-                               json=body,
-                               verify=self.verify)
+        results = requests.put(
+            self.urlbase + "/devices/{}/switch/ports/{}".format(switch_sn, port),
+            headers=self.headers,
+            json=body,
+            verify=self.verify,
+        )
         return results
 
     def _set_switchport_state(self, switch_sn, port, state=True):
@@ -419,10 +585,12 @@ class Client(ThirdPartyInterface):
         :return:
         """
         body = {"enabled": state}
-        results = requests.put(self.urlbase + '/devices/{}/switch/ports/{}'.format(switch_sn, port),
-                               headers=self.headers,
-                               json=body,
-                               verify=self.verify)
+        results = requests.put(
+            self.urlbase + "/devices/{}/switch/ports/{}".format(switch_sn, port),
+            headers=self.headers,
+            json=body,
+            verify=self.verify,
+        )
         return results
 
     def _get_block_type(self, client):
@@ -431,32 +599,50 @@ class Client(ThirdPartyInterface):
         :param client: client dictionary
         :return: 'dev type', boolean
         """
-        self.logger.debug('_get_block_type client: {}'.format(client))
-        if client.get('switchport') and client.get('recentDeviceSerial') and \
-                client.get('recentDeviceConnection') == 'Wired' and not client.get('ssid'):
-            ports = requests.get(self.urlbase + '/devices/{}/switch/ports/statuses'.format(
-                        client.get('recentDeviceSerial')
-                    ), headers=self.headers, verify=self.verify)
+        self.logger.debug("_get_block_type client: {}".format(client))
+        if (
+            client.get("switchport")
+            and client.get("recentDeviceSerial")
+            and client.get("recentDeviceConnection") == "Wired"
+            and not client.get("ssid")
+        ):
+            ports = requests.get(
+                self.urlbase
+                + "/devices/{}/switch/ports/statuses".format(
+                    client.get("recentDeviceSerial")
+                ),
+                headers=self.headers,
+                verify=self.verify,
+            )
             if ports.ok:
                 for port in ports.json():
-                    if client.get('switchport') == port.get('portId'):
-                        if port.get('isUplink'):
-                            self.logger.info('Client {} shows connected to uplink {}.'.format(
-                                client.get('id'),
-                                port.get('portId'))
+                    if client.get("switchport") == port.get("portId"):
+                        if port.get("isUplink"):
+                            self.logger.info(
+                                "Client {} shows connected to uplink {}.".format(
+                                    client.get("id"), port.get("portId")
+                                )
                             )
-                            return 'switch', False
-                        elif port.get('clientCount') > 1:
-                            self.logger.info('Port show more than 1 client on port: {}'.format(port.get('clientCount')))
-                            return 'switch', False
+                            return "switch", False
+                        elif port.get("clientCount") > 1:
+                            self.logger.info(
+                                "Port show more than 1 client on port: {}".format(
+                                    port.get("clientCount")
+                                )
+                            )
+                            return "switch", False
                         else:
-                            return 'switch', True
+                            return "switch", True
             else:
-                self.logger.error('Unable to retrieve switchport information: {}'.format(ports.content))
-        if client.get('ssid') and client.get('recentDeviceConnection') == 'WLAN':
-            return 'WLAN', True
+                self.logger.error(
+                    "Unable to retrieve switchport information: {}".format(
+                        ports.content
+                    )
+                )
+        if client.get("ssid") and client.get("recentDeviceConnection") == "WLAN":
+            return "WLAN", True
         else:
-            return 'unknown', False
+            return "unknown", False
 
     def _get_switch_port_schedule(self, switch_sn, port):
         """
@@ -465,34 +651,47 @@ class Client(ThirdPartyInterface):
         :param port: port number of switch
         :return: int
         """
-        results = requests.get(self.urlbase + '/devices/{}/switch/ports/{}'.format(switch_sn, port),
-                               headers=self.headers, verify=self.verify)
+        results = requests.get(
+            self.urlbase + "/devices/{}/switch/ports/{}".format(switch_sn, port),
+            headers=self.headers,
+            verify=self.verify,
+        )
         if results.ok:
-            if results.json().get('portScheduleId') is None:
-                return 'No_Scheduler'
+            if results.json().get("portScheduleId") is None:
+                return "No_Scheduler"
             else:
-                return results.json().get('portScheduleId')
+                return results.json().get("portScheduleId")
         else:
-            self.logger.info('Unable to obtain port scheduler information for switch: {}, port:{}. {}'.format(
-                switch_sn, port, results.content
-            ))
+            self.logger.info(
+                "Unable to obtain port scheduler information for switch: {}, port:{}. {}".format(
+                    switch_sn, port, results.content
+                )
+            )
             return None
 
     def _get_port_schedule_id(self, network):
         """
         :return:
         """
-        params = {'name': self.port_schedule_name}
-        results = requests.get(self.urlbase + '/networks/{}/switch/portSchedules'.format(network),
-                               headers=self.headers,
-                               params=params,
-                               verify=self.verify)
+        params = {"name": self.port_schedule_name}
+        results = requests.get(
+            self.urlbase + "/networks/{}/switch/portSchedules".format(network),
+            headers=self.headers,
+            params=params,
+            verify=self.verify,
+        )
         if results.ok:
             if len(results.json()) == 1:
-                return results.json()[0].get('id')
+                return results.json()[0].get("id")
             else:
-                self.logger.info('More than one port schedule found with name: {}'.format(self.port_schedule_name))
+                self.logger.info(
+                    "More than one port schedule found with name: {}".format(
+                        self.port_schedule_name
+                    )
+                )
                 return None
         else:
-            self.logger.info('Unable to retrieve port schedule for network {}'.format(network))
+            self.logger.info(
+                "Unable to retrieve port schedule for network {}".format(network)
+            )
             return None

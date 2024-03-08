@@ -9,21 +9,23 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 from third_party_clients.trendmicro_cloudone.cloudone_config import (
-    API_KEY,
     BASE_URL,
     VERIFY,
 )
 
+from vectra_automated_response import _get_password
+
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "CloudOne Client"
         self.logger = logging.getLogger()
         self.url = BASE_URL + "/api"
+        self.api_key = _get_password("CloudOne", "API_Key", modify=kwargs["modify"])
         self.headers = {
             "api-version": "v1",
             "Content-Type": "application/json",
-            "Authorization": "ApiKey " + API_KEY,
+            "Authorization": "ApiKey " + self.api_key,
         }
         self.verify = VERIFY
         # Instantiate parent class

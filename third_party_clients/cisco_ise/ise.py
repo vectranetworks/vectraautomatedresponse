@@ -1,8 +1,8 @@
 import json
 import logging
-import time
 import re
 import sys
+import time
 
 import requests
 import xmltodict
@@ -10,8 +10,8 @@ from third_party_clients.cisco_ise.ise_config import (
     CHECK_SSL,
     ENHANCED,
     ISE_APPLIANCE_IP,
-    ISE_PASSWORD,
-    ISE_USERNAME,
+    # ISE_PASSWORD,
+    # ISE_USERNAME,
     PORTBOUNCE_POLICY,
     QUARANTAINE_POLICY,
 )
@@ -23,7 +23,10 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
-SUCCESS_CODES = [200,201,202,203,204]
+from vectra_automated_response import _get_password
+
+SUCCESS_CODES = [200, 201, 202, 203, 204]
+
 
 def fetch_csrf(func):
     # CSRF is only used with ERS calls
@@ -43,9 +46,11 @@ def fetch_csrf(func):
                 }
                 return func(self, *args, **kwargs)
             except KeyError:
-                if 'X-CSRF-Token' not in result.headers:
-                    self.logger.warn("CSRF Token not returned. Ensure CSRF is configured for the ISE API.")
-                    sys.exit() 
+                if "X-CSRF-Token" not in result.headers:
+                    self.logger.warn(
+                        "CSRF Token not returned. Ensure CSRF is configured for the ISE API."
+                    )
+                    sys.exit()
         else:
             return func(self, *args, **kwargs)
 
@@ -55,6 +60,7 @@ def fetch_csrf(func):
 class HTTPException(Exception):
     pass
 
+
 def _format_url(url):
     if ":/" not in url:
         url = "https://" + url
@@ -63,8 +69,9 @@ def _format_url(url):
     url = url[:-1] if url.endswith("/") else url
     return url
 
+
 class Client(ThirdPartyInterface):
-    def __init__(self, url=None):
+    def __init__(self, **kwargs):
         self.name = "ISE Client"
         """
         Initialize Cisco ISE client
@@ -74,8 +81,11 @@ class Client(ThirdPartyInterface):
         :param verify: Verify SSL (default: False) - optional
         """
         self.logger = logging.getLogger("ISE")
-        self.url = f'{_format_url(ISE_APPLIANCE_IP)}'
-        self.auth = (ISE_USERNAME, ISE_PASSWORD)
+        self.url = f"{_format_url(ISE_APPLIANCE_IP)}"
+        self.auth = (
+            _get_password("Cisco_ISE", "Username", modify=kwargs["modify"]),
+            _get_password("Cisco_ISE", "Password", modify=kwargs["modify"]),
+        )
         self.verify = CHECK_SSL
         self.portbounce_policy = PORTBOUNCE_POLICY
         self.quarantine_policy = QUARANTAINE_POLICY
@@ -89,7 +99,6 @@ class Client(ThirdPartyInterface):
         }
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
-        
 
     def block_host(self, host):
         blocked_macs = []
@@ -157,7 +166,9 @@ class Client(ThirdPartyInterface):
         """
         # We need first to put the endpoint in a temporary policy to make the port bounce
         try:
-            self.logger.debug("Applying portbounce policy to {mac}".format(mac=mac_address))
+            self.logger.debug(
+                "Applying portbounce policy to {mac}".format(mac=mac_address)
+            )
             self._add_mac_to_policy(mac_address, self.portbounce_policy)
         except HTTPException:
             pass
@@ -185,12 +196,16 @@ class Client(ThirdPartyInterface):
         response = requests.put(
             "{url}:9060/ers/config/ancendpoint/clear".format(url=self.url),
             auth=self.auth,
-            headers={**self.ers_headers, **kwargs["headers"]} if "headers" in kwargs else self.ers_headers,
+            headers=(
+                {**self.ers_headers, **kwargs["headers"]}
+                if "headers" in kwargs
+                else self.ers_headers
+            ),
             json=payload,
             verify=self.verify,
             cookies=kwargs["cookies"] if "cookies" in kwargs else None,
         )
-        if response.content.decode() == '':
+        if response.content.decode() == "":
             msg = response
         else:
             msg = response.content
@@ -198,12 +213,17 @@ class Client(ThirdPartyInterface):
         if response.status_code in SUCCESS_CODES:
             return mac_address
         elif response.status_code == 403 and ENHANCED is False:
-            self.logger.warn("{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(msg=response.content.decode().split('<')[0]))
+            self.logger.warn(
+                "{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(
+                    msg=response.content.decode().split("<")[0]
+                )
+            )
         elif response.json()["ERSResponse"]["messages"][0]["title"] == "Radius Failure":
             return mac_address
         else:
-            self.logger.warn(f'Unable to unblock {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}')
-
+            self.logger.warn(
+                f'Unable to unblock {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}'
+            )
 
     @fetch_csrf
     def _add_mac_to_policy(self, mac_address, policy_name, **kwargs):
@@ -225,7 +245,11 @@ class Client(ThirdPartyInterface):
         response = requests.put(
             "{url}:9060/ers/config/ancendpoint/apply".format(url=self.url),
             auth=self.auth,
-            headers={**self.ers_headers, **kwargs["headers"]} if "headers" in kwargs else self.ers_headers,
+            headers=(
+                {**self.ers_headers, **kwargs["headers"]}
+                if "headers" in kwargs
+                else self.ers_headers
+            ),
             json=payload,
             verify=self.verify,
             cookies=kwargs["cookies"] if "cookies" in kwargs else None,
@@ -235,13 +259,17 @@ class Client(ThirdPartyInterface):
         if response.status_code in SUCCESS_CODES:
             return mac_address
         elif response.status_code == 403 and ENHANCED is False:
-            self.logger.warn("{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(msg=response.content.decode().split('<')[0]))
+            self.logger.warn(
+                "{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(
+                    msg=response.content.decode().split("<")[0]
+                )
+            )
         elif response.json()["ERSResponse"]["messages"][0]["title"] == "Radius Failure":
             return mac_address
         else:
-            self.logger.warn(f'Unable to block {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}')
-        
-        
+            self.logger.warn(
+                f'Unable to block {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}'
+            )
 
     def _get_mac_from_ip(self, ip_address, **kwargs):
         """
@@ -256,7 +284,11 @@ class Client(ThirdPartyInterface):
             ),
             auth=self.auth,
             verify=False,
-            headers={**self.mnt_headers, **kwargs["headers"]} if "headers" in kwargs else self.mnt_headers,
+            headers=(
+                {**self.mnt_headers, **kwargs["headers"]}
+                if "headers" in kwargs
+                else self.mnt_headers
+            ),
             cookies=kwargs["cookies"] if "cookies" in kwargs else None,
         )
 
@@ -265,8 +297,8 @@ class Client(ThirdPartyInterface):
             raise HTTPException("No Session on ISE for IP {}".format(ip_address))
         else:
             xml = json.loads(json.dumps(xmltodict.parse(r.text)))
-            for session in xml['activeList']['activeSession']:
-                if session['nas_ip_address'] == ip_address:
-                    mac_address_list.append(session['calling_station_id'])
+            for session in xml["activeList"]["activeSession"]:
+                if session["nas_ip_address"] == ip_address:
+                    mac_address_list.append(session["calling_station_id"])
 
             return mac_address_list

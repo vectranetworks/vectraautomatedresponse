@@ -9,19 +9,20 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 from third_party_clients.trendmicro_visionone.vision_one_config import (
-    API_KEY,
     BASE_URL,
     VERIFY,
 )
 
+from vectra_automated_response import _get_password
+
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = " VisionOne Client"
         self.logger = logging.getLogger()
         self.url = BASE_URL + "/v3.0/"
         self.verify = VERIFY
-        self.api_key = API_KEY
+        self.api_key = _get_password("VisionOne", "API_Key", modify=kwargs["modify"])
         self.headers = {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + self.api_key,
@@ -221,4 +222,3 @@ class Client(ThirdPartyInterface):
             "CloudOne client does not implement destination IP blocking"
         )
         return []
-

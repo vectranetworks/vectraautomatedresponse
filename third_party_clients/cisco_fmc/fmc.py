@@ -3,7 +3,11 @@ import logging
 
 import requests
 from requests.auth import HTTPBasicAuth
-from third_party_clients.cisco_fmc.fmc_config import GROUP_ID, PASSWORD, URL, USERNAME
+from third_party_clients.cisco_fmc.fmc_config import (
+    URL,
+)
+
+# GROUP_ID, PASSWORD, URL, USERNAME
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -13,14 +17,21 @@ from third_party_clients.third_party_interface import (
 )
 from urllib3.exceptions import InsecureRequestWarning
 
+from vectra_automated_response import _get_password
+
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "FMC Client"
         self.logger = logging.getLogger()
         self._check_connection()
+        self.group_id = _get_password("Cisco_FMC", "Group_ID", modify=kwargs["modify"])
+        self.auth = (
+            _get_password("Cisco_FMC", "Username", modify=kwargs["modify"]),
+            _get_password("Cisco_FMC", "Password", modify=kwargs["modify"]),
+        )
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
@@ -42,7 +53,7 @@ class Client(ThirdPartyInterface):
                     f"Host object created successfully (ID: {host_fmc_id})."
                 )
 
-            block_group = self._get_group(GROUP_ID)
+            block_group = self._get_group(self.group_id)
             if host_fmc_id in [host["id"] for host in block_group["objects"]]:
                 self.logger.error(
                     f"{host.ip} / {host_fmc_id} is already blocked. Skipping"
@@ -63,7 +74,7 @@ class Client(ThirdPartyInterface):
             f"Processing unblock request for IP: {host.ip} / ID: {host_fmc_id}"
         )
         try:
-            block_group = self._get_group(GROUP_ID)
+            block_group = self._get_group(self.group_id)
             if host_fmc_id not in [host["id"] for host in block_group["objects"]]:
                 self.logger.error(f"{host.ip} / {host_fmc_id} is not blocked. Skipping")
                 return []
@@ -128,7 +139,7 @@ class Client(ThirdPartyInterface):
         response = requests.post(
             URL + auth_endpoint,
             verify=False,
-            auth=HTTPBasicAuth(USERNAME, PASSWORD),
+            auth=self.auth,
         )
         if not response.status_code == 204:
             raise requests.HTTPError(

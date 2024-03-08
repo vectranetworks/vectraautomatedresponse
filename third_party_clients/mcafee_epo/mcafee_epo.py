@@ -4,11 +4,12 @@ import logging
 import requests
 from third_party_clients.mcafee_epo.mcafee_config import (
     MCAFEE_HOSTNAME,
-    MCAFEE_PASSWORD,
+    # MCAFEE_PASSWORD,
     MCAFEE_PORT,
     MCAFEE_TAGID,
-    MCAFEE_USERNAME,
 )
+
+# MCAFEE_USERNAME,
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -16,6 +17,8 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+
+from vectra_automated_response import _get_password
 
 
 def request_error_handler(func):
@@ -58,23 +61,23 @@ class Client:
     API calls.
     """
 
-    def __init__(self, session=None):
+    def __init__(self, **kwargs):
         self.name = "McAfee EPO Client"
         """Create a client for the given ePO server.
 
         :param url: Location of ePO server.
         :param username: Username to authenticate.
         :param password: Password to authenticate.
-        :param session: Custom instance of :class:`requests.Session`,
-            useful for configuring server verification.
+        
         """
         self.hostname = MCAFEE_HOSTNAME
         self.port = MCAFEE_PORT
         self.url = f"https://{self.hostname}:{self.port}"
-        self.username = MCAFEE_USERNAME
-        self.password = MCAFEE_PASSWORD
+        self.username = _get_password("McAfee", "Username", modify=kwargs["modify"])
+        self.password = _get_password("McAfee", "Password", modify=kwargs["modify"])
         self.tagID = MCAFEE_TAGID
         self._token = None
+        self.logger = logging.getLogger("McAfee")
 
     def _get_token(self, _skip=False):
         """Get the security token if it's not already cached.
@@ -150,12 +153,12 @@ class Client:
         return host.ip
 
     def groom_host(self, host) -> dict:
-        self.logger.warning("PXGRID client does not implement host grooming")
+        self.logger.warning("McAfee client does not implement host grooming")
         return []
 
     def block_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn("PXGRID client does not implement detection-based blocking")
+        self.logger.warn("McAfee client does not implement detection-based blocking")
         return []
 
     def unblock_detection(self, detection):

@@ -1,11 +1,8 @@
 ### GENERAL SETUP
 # Vectra brain API access.
 COGNITO_URL = "https://<fqdn or ip>"
-COGNITO_TOKEN = "api token"
-COGNITO_CLIENT_ID = "client_id"
-COGNITO_SECRET_KEY = "secret_key"
 # V3 is a boolean for which API Client to use
-V3 = False 
+V3 = False
 LOG_TO_FILE = False
 LOG_FILE = "vae.log"
 SLEEP_MINUTES = 5
@@ -75,7 +72,6 @@ SRC_EMAIL = "example@mail.com"
 DST_EMAIL = "example@mail.com"
 SMTP_AUTH = False
 SMTP_USER = "user"
-SMTP_PASSWORD = "password"
 
 # Syslog Configuration
 SYSLOG_SERVER = "fqdn or ip"

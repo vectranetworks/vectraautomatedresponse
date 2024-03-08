@@ -1,7 +1,7 @@
 import logging
 
 import requests
-from third_party_clients.cisco_amp.amp_config import API_KEY, CLIENT_ID, URL
+from third_party_clients.cisco_amp.amp_config import URL
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -9,16 +9,18 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+from vectra_automated_response import _get_password
 from urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "AMP Client"
         self.logger = logging.getLogger()
         self._check_connection()
+        self.auth = (_get_password("Cisco_Amp","Client_ID", modify=kwargs["modify"]), _get_password("Cisco_Amp","API_Key",modify=kwargs["modify"]))
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
@@ -106,7 +108,7 @@ class Client(ThirdPartyInterface):
             response = requests.get(
                 url=f'{URL}/v1/{api_endpoint}',
                 verify=False,
-                auth=(CLIENT_ID, API_KEY)
+                auth=self.auth
                 )
             response.raise_for_status()
             self.logger.info("Connection check successful.")
@@ -119,7 +121,7 @@ class Client(ThirdPartyInterface):
         response = requests.get(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=(CLIENT_ID, API_KEY)
+            auth=()
             )
         response.raise_for_status()
         data = response.json()
@@ -139,7 +141,7 @@ class Client(ThirdPartyInterface):
             response = requests.get(
                 url=f'{URL}/v1/{api_endpoint}',
                 verify=False,
-                auth=(CLIENT_ID, API_KEY)
+                auth=self.auth
                 )
             response.raise_for_status()
             data = response.json()
@@ -162,7 +164,7 @@ class Client(ThirdPartyInterface):
         response = requests.get(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=(CLIENT_ID, API_KEY)
+            auth=self.auth
             )
         response.raise_for_status()
         data = response.json()
@@ -181,7 +183,7 @@ class Client(ThirdPartyInterface):
         response = requests.put(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=(CLIENT_ID, API_KEY)
+            auth=self.auth
             )
         response.raise_for_status()
 
@@ -191,11 +193,11 @@ class Client(ThirdPartyInterface):
         response = requests.delete(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=(CLIENT_ID, API_KEY)
+            auth=self.auth
             )
         response.raise_for_status()        response = requests.delete(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=(CLIENT_ID, API_KEY)
+            auth=self.auth
             )
         response.raise_for_status()

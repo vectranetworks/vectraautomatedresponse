@@ -20,7 +20,7 @@ from third_party_clients.third_party_interface import (
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "External Call Client"
         # Instantiate parent class
         self.logger = logging.getLogger()
@@ -35,27 +35,38 @@ class Client(ThirdPartyInterface):
             if r.returncode == 0:
                 return [id]
             else:
-                self.logger.warning('Execution of block_host command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of block_host command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call block_host not configured.')
+            self.logger.info("external_call block_host not configured.")
             return []
 
     def block_account(self, account) -> list:
         if ACCOUNT_BLOCK_CMD:
             id = uuid.uuid4()
             cmd = ACCOUNT_BLOCK_CMD
-            cmd.append(account.ldap.get('sam_account_name') if account.ldap.get('sam_account_name')
-                       else account.fake_sam)
+            cmd.append(
+                account.ldap.get("sam_account_name")
+                if account.ldap.get("sam_account_name")
+                else account.fake_sam
+            )
             cmd.append(account.context)
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return [id]
             else:
-                self.logger.warning('Execution of block_account command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of block_account command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call block_account not configured.')
+            self.logger.info("external_call block_account not configured.")
             return []
 
     def unblock_host(self, host):
@@ -66,29 +77,40 @@ class Client(ThirdPartyInterface):
             if r.returncode == 0:
                 return host.blocked_elements.get(self.__class__.__name__)
             else:
-                self.logger.warning('Execution of unblock_host command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of unblock_host command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call unblock_host not configured.')
+            self.logger.info("external_call unblock_host not configured.")
             return []
 
     def unblock_account(self, account):
         if ACCOUNT_UNBLOCK_CMD:
             cmd = ACCOUNT_UNBLOCK_CMD
-            cmd.append(account.ldap.get('sam_account_name') if account.ldap.get('sam_account_name')
-                       else account.fake_sam)
+            cmd.append(
+                account.ldap.get("sam_account_name")
+                if account.ldap.get("sam_account_name")
+                else account.fake_sam
+            )
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return account.blocked_elements.get(self.__class__.__name__)
             else:
-                self.logger.warning('Execution of block_account command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of block_account command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call unblock_account not configured.')
+            self.logger.info("external_call unblock_account not configured.")
             return []
 
     def groom_host(self, host) -> dict:
-        self.logger.info('external_call groom_host not configured.')
+        self.logger.info("external_call groom_host not configured.")
         return []
 
     def block_detection(self, detection):
@@ -100,10 +122,14 @@ class Client(ThirdPartyInterface):
             if r.returncode == 0:
                 return [id]
             else:
-                self.logger.warning('Execution of block_detection command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of block_detection command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call block_detection not configured.')
+            self.logger.info("external_call block_detection not configured.")
             return []
 
     def unblock_detection(self, detection):
@@ -114,16 +140,20 @@ class Client(ThirdPartyInterface):
             if r.returncode == 0:
                 return detection.blocked_elements.get(self.__class__.__name__)
             else:
-                self.logger.warning('Execution of unblock_detection command: {} was not successful'.format(r.args))
+                self.logger.warning(
+                    "Execution of unblock_detection command: {} was not successful".format(
+                        r.args
+                    )
+                )
                 return []
         else:
-            self.logger.info('external_call unblock_detection not configured.')
+            self.logger.info("external_call unblock_detection not configured.")
             return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.info('external_call block static destination IP not configured.')
+        self.logger.info("external_call block static destination IP not configured.")
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        self.logger.info('external_call block static destination IP not configured.')
-        return []     
+        self.logger.info("external_call block static destination IP not configured.")
+        return []

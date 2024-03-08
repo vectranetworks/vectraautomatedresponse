@@ -7,7 +7,7 @@ from third_party_clients.third_party_interface import ThirdPartyInterface
 
 # class TestClient(ThirdPartyInterface):
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         # Instantiate parent class
         self.name = "Test Client"
         self.logger = logging.getLogger()

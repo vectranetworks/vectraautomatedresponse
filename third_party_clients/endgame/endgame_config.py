@@ -1,4 +1,3 @@
 # Connection information
-ENDGAME_URL = 'https://<FQDN>'
-ENDGAME_API_TOKEN = '<api-key>'
+ENDGAME_URL = "https://<FQDN>"
 VERIFY_SSL = False
