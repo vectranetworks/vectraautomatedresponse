@@ -6,8 +6,6 @@ import requests
 from requests import HTTPError
 from third_party_clients.clearpass.clearpass_config import (
     CHECK_SSL,
-    # CLIENT_ID,
-    # CLIENT_SECRET,
     HOSTNAME,
 )
 

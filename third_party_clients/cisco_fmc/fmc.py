@@ -7,7 +7,6 @@ from third_party_clients.cisco_fmc.fmc_config import (
     URL,
 )
 
-# GROUP_ID, PASSWORD, URL, USERNAME
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,

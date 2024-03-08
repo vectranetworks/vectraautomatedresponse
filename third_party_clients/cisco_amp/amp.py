@@ -121,7 +121,7 @@ class Client(ThirdPartyInterface):
         response = requests.get(
             url=f'{URL}/v1/{api_endpoint}',
             verify=False,
-            auth=()
+            auth=self.auth
             )
         response.raise_for_status()
         data = response.json()

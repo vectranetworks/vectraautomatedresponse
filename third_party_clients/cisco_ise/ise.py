@@ -10,8 +10,6 @@ from third_party_clients.cisco_ise.ise_config import (
     CHECK_SSL,
     ENHANCED,
     ISE_APPLIANCE_IP,
-    # ISE_PASSWORD,
-    # ISE_USERNAME,
     PORTBOUNCE_POLICY,
     QUARANTAINE_POLICY,
 )
@@ -298,7 +296,10 @@ class Client(ThirdPartyInterface):
         else:
             xml = json.loads(json.dumps(xmltodict.parse(r.text)))
             for session in xml["activeList"]["activeSession"]:
-                if session["nas_ip_address"] == ip_address:
-                    mac_address_list.append(session["calling_station_id"])
+                try:
+                    if ip_address in session["ipAddresses"]:
+                        mac_address_list.append(session["calling_station_id"])
+                except KeyError:
+                    pass
 
             return mac_address_list

@@ -6,9 +6,7 @@ from datetime import datetime
 
 import requests
 from third_party_clients.pan_cortex.cortex_config import (
-    # CORTEX_API_TOKEN,
     CORTEX_API_TYPE,
-    # CORTEX_KEY_ID,
     CORTEX_URL,
 )
 from third_party_clients.third_party_interface import (

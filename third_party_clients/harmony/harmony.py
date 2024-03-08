@@ -4,7 +4,6 @@ import logging
 import requests
 from cachetools import TTLCache, cached
 from third_party_clients.bitdefender.bitdefender_config import (
-    # API_KEY,
     BLOCK_MULTIPLE,
     CHECK_SSL,
     HOSTNAME,

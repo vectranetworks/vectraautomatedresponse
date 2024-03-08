@@ -9,10 +9,6 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 from third_party_clients.ubiquiti.ubiquiti_config import (
-    # WATCHGAURD_USER,
-    # WATCHGUARD_ACCOUNT_ID,
-    # WATCHGUARD_API_KEY,
-    # WATCHGUARD_PASSWORD,
     WATCHGUARD_URL,
 )
 

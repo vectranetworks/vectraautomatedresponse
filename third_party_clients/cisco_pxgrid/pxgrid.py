@@ -13,10 +13,7 @@ from third_party_clients.cisco_pxgrid.pxgrid_config import (
     PXGRID_CA_BUNDLE,
     PXGRID_CERT,
     PXGRID_KEY,
-    # PXGRID_KEY_PASSWORD,
-    # PXGRID_PASSWORD,
     PXGRID_PORT,
-    # PXGRID_USERNAME,
     PXGRID_VERIFY,
     QUARANTAINE_POLICY,
 )

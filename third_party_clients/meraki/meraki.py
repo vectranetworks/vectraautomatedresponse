@@ -5,7 +5,6 @@ import keyring
 import requests
 import urllib3
 from third_party_clients.meraki.meraki_config import (
-    # API_KEY,
     BLOCK_GROUP_POLICY,
     BLOCK_INACTIVE_CLIENTS,
     BLOCK_MULTIPLE_IP,

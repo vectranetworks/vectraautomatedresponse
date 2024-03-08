@@ -12,8 +12,6 @@ from cryptography.hazmat.primitives import serialization
 from third_party_clients.pulse_nac.pulse_nac_config import (
     CHECK_SSL,
     PULSE_APPLIANCE,
-    # PULSE_PASSWORD,
-    # PULSE_USERNAME,
     RSA_FILE,
     RSA_PUB_FILE,
 )

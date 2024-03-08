@@ -12,10 +12,7 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 from third_party_clients.withsecure_elements.elements_config import (
-    # API_KEY,
     BASE_URL,
-    # CLIENT_ID,
-    # ORGANIZATION_UUID,
     VERIFY,
 )
 

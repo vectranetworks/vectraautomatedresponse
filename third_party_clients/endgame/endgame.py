@@ -1,11 +1,7 @@
-import io
 import logging
 from enum import Enum, auto, unique
 
-import requests
-from requests import HTTPError
 from third_party_clients.endgame.endgame_config import (
-    # ENDGAME_API_TOKEN,
     ENDGAME_URL,
     VERIFY_SSL,
 )

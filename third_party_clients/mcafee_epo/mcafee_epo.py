@@ -4,12 +4,9 @@ import logging
 import requests
 from third_party_clients.mcafee_epo.mcafee_config import (
     MCAFEE_HOSTNAME,
-    # MCAFEE_PASSWORD,
     MCAFEE_PORT,
     MCAFEE_TAGID,
 )
-
-# MCAFEE_USERNAME,
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
