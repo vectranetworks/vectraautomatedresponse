@@ -1,6 +1,6 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = "https://192.168.54.138"
+COGNITO_URL = ""
 V3 = False
 LOG_TO_FILE = False
 LOG_FILE = "var.log"
@@ -9,8 +9,7 @@ SLEEP_MINUTES = 5
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements']
-#THIRD_PARTY_CLIENTS = ["test_client"]
-THIRD_PARTY_CLIENTS = ["cisco_pxgrid"]
+THIRD_PARTY_CLIENTS = ["test_client"]
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
