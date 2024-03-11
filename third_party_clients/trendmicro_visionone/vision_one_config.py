@@ -1,3 +1,2 @@
-BASE_URL = 'https://api.<region>.xdr.trendmicro.com'
-API_KEY = '<api-key>'
+BASE_URL = "https://api.<region>.xdr.trendmicro.com"
 VERIFY = False

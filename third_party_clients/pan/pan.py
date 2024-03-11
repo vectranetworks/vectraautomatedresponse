@@ -5,10 +5,9 @@ import requests
 from third_party_clients.pan.pan_config import (
     EXTERNAL_BLOCK_TAG,
     INTERNAL_BLOCK_TAG,
-    PAN_APPLIANCE_LIST,
+    URLS,
     VERIFY_SSL,
 )
-
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -17,12 +16,21 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
+from vectra_automated_response import _get_password
+
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "PAN Client"
         self.logger = logging.getLogger()
-        self.firewalls = PAN_APPLIANCE_LIST
+        self.firewalls = []
+        for url in URLS:
+            self.firewalls.append(
+                {
+                    "url": url,
+                    "api_key": _get_password("PAN", "API_Key", modify=kwargs["modify"]),
+                }
+            )
         self.verify = VERIFY_SSL
         self.internal_block_tag = INTERNAL_BLOCK_TAG
         self.external_block_tag = EXTERNAL_BLOCK_TAG
@@ -172,4 +180,3 @@ class Client(ThirdPartyInterface):
                 )
             )
             return []
-

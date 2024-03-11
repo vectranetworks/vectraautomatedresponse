@@ -8,9 +8,7 @@ from third_party_clients.sophos.sophos_config import (
     ADDRESS,
     BLOCK_LIST_IPHOST_NAME,
     IS_ENCRYPTED,
-    PASSWORD,
     PORT,
-    USERNAME,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -21,17 +19,20 @@ from third_party_clients.third_party_interface import (
 )
 from urllib3.exceptions import InsecureRequestWarning
 
+from vectra_automated_response import _get_password
+
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
+
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "Sophos Client"
         self.logger = logging.getLogger()
         self.baseurl = f"https://{ADDRESS}:{PORT}/webconsole/APIController?reqxml="
-        self.login_xml = f"<Login><Username>{USERNAME}</Username><Password passwordform=\"{'encrypted' if IS_ENCRYPTED else 'plain'}\">{PASSWORD}</Password></Login>"
+        self.login_xml = f"<Login><Username>{_get_password("Sophos", "Username", modify=kwargs["modify"])}</Username><Password passwordform=\"{'encrypted' if IS_ENCRYPTED else 'plain'}\">{_get_password("Sophos", "Password", modify=kwargs["modify"])}</Password></Login>"
         self._login_check()
         # Instantiate parent class
-        ThirdPartyInterface.__init__ (self)
+        ThirdPartyInterface.__init__(self)
 
     def block_host(self, host) -> list[str]:
         return self._block_ip(ip=host.ip)
@@ -40,7 +41,7 @@ class Client(ThirdPartyInterface):
         return self._unblock_ip(ip=host.ip)
 
     def groom_host(self, host) -> dict:
-        self.logger.warning('Sophos client does not implement host grooming')
+        self.logger.warning("Sophos client does not implement host grooming")
         return []
 
     def block_detection(self, detection):
@@ -84,37 +85,48 @@ class Client(ThirdPartyInterface):
     def _login_check(self):
         r = self._make_api_call("")
         xml = ET.fromstring(r.text)
-        if xml.find('Login').find('status').text == "Authentication Successful":
-            self.logger.info("Sophos Firewall Integartion API Login Check Successful")
+        if xml.find("Login").find("status").text == "Authentication Successful":
+            self.logger.info("Sophos Firewall Integration API Login Check Successful")
         else:
-            self.logger.error("Sophos Firewall Integartion API Login Check Failed. Please check credentials.")
+            self.logger.error(
+                "Sophos Firewall Integration API Login Check Failed. Please check credentials."
+            )
             exit()
 
     def _get_blocked_ips(self) -> list[str]:
-        r = self._make_api_call(f"<Get><IPHost><Filter><key name=\"Name\" criteria=\"=\">{BLOCK_LIST_IPHOST_NAME}</key></Filter></IPHost></Get>")
+        r = self._make_api_call(
+            f'<Get><IPHost><Filter><key name="Name" criteria="=">{BLOCK_LIST_IPHOST_NAME}</key></Filter></IPHost></Get>'
+        )
         xml = ET.fromstring(r.text)
-        iphosts = xml.findall('IPHost')
+        iphosts = xml.findall("IPHost")
         if len(iphosts) > 1:
-            self.logger.warn(f"Multiple IPHosts with Name equaling \"{BLOCK_LIST_IPHOST_NAME}\" found. Using first one. Please verify firewall is setup according to documentation.")
+            self.logger.warn(
+                f'Multiple IPHosts with Name equaling "{BLOCK_LIST_IPHOST_NAME}" found. Using first one. Please verify firewall is setup according to documentation.'
+            )
         elif len(iphosts) == 0:
-            self.logger.error(f"No IPHost with Name equaling \"{BLOCK_LIST_IPHOST_NAME}\" found. Please verify firewall is setup according to documentation.")
+            self.logger.error(
+                f'No IPHost with Name equaling "{BLOCK_LIST_IPHOST_NAME}" found. Please verify firewall is setup according to documentation.'
+            )
             exit()
-        blocked_ips = iphosts[0].find('ListOfIPAddresses').text.split(sep=',')
+        blocked_ips = iphosts[0].find("ListOfIPAddresses").text.split(sep=",")
         self.logger.debug(f"Retrieved currently blocked ips: {blocked_ips}")
         return blocked_ips
 
     def _update_blocked_ips(self, ips_to_block: list[str]) -> bool:
-        ip_csv = ','.join(ips_to_block)
-        r = self._make_api_call(f"<Set operation=\"update\"><IPHost><Name>{BLOCK_LIST_IPHOST_NAME}</Name><IPFamily>IPv4</IPFamily><HostType>IPList</HostType><ListOfIPAddresses>{ip_csv}</ListOfIPAddresses></IPHost></Set>")
+        ip_csv = ",".join(ips_to_block)
+        r = self._make_api_call(
+            f'<Set operation="update"><IPHost><Name>{BLOCK_LIST_IPHOST_NAME}</Name><IPFamily>IPv4</IPFamily><HostType>IPList</HostType><ListOfIPAddresses>{ip_csv}</ListOfIPAddresses></IPHost></Set>'
+        )
         xml = ET.fromstring(r.text)
-        status = xml.find('IPHost').find('Status')
-        status_code = status.attrib['code']
+        status = xml.find("IPHost").find("Status")
+        status_code = status.attrib["code"]
         status_msg = status.text
-        if status_code != '200':
-            self.logger.error(f"Error updating IP list of IPHost \"{BLOCK_LIST_IPHOST_NAME}\". (Status Code: {status_code} - Message: {status_msg})")
+        if status_code != "200":
+            self.logger.error(
+                f'Error updating IP list of IPHost "{BLOCK_LIST_IPHOST_NAME}". (Status Code: {status_code} - Message: {status_msg})'
+            )
             return False
         return True
-
 
     def _block_ip(self, ip: str) -> list[str]:
         if self._validate_ip_address(ip):
@@ -139,4 +151,4 @@ class Client(ThirdPartyInterface):
             _ = ipaddress.ip_address(ip)
             return True
         except ValueError:
-            return False  
+            return False

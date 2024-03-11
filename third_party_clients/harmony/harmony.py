@@ -1,24 +1,23 @@
 import base64
-import json
 import logging
-import time
 
 import requests
 from cachetools import TTLCache, cached
 from third_party_clients.bitdefender.bitdefender_config import (
-    API_KEY,
     BLOCK_MULTIPLE,
     CHECK_SSL,
     HOSTNAME,
 )
 from third_party_clients.third_party_interface import ThirdPartyInterface
 
+from vectra_automated_response import _get_password
+
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "Harmony Client"
         self.logger = logging.getLogger()
-        self.api_key = API_KEY
+        self.api_key = _get_password("Harmony", "API_Key", modify=kwargs["modify"])
         self.url = "https://" + HOSTNAME + "/api/v1.0/jsonrpc"
         self.verify = CHECK_SSL
         self.block_multiple = BLOCK_MULTIPLE
@@ -32,4 +31,3 @@ class Client(ThirdPartyInterface):
         self.company_id = self._get_company_id()
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
-

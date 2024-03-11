@@ -1,11 +1,7 @@
-import io
 import logging
 from enum import Enum, auto, unique
 
-import requests
-from requests import HTTPError
 from third_party_clients.endgame.endgame_config import (
-    ENDGAME_API_TOKEN,
     ENDGAME_URL,
     VERIFY_SSL,
 )
@@ -16,6 +12,8 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+
+from vectra_automated_response import _get_password
 
 
 @unique
@@ -30,12 +28,13 @@ class BlockType(Enum):
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "Endgame Client"
         self.logger = logging.getLogger()
         self.url = "{url}/api/v1".format(url=ENDGAME_URL)
         self.headers = {
-            "Authorization": "JWT " + ENDGAME_API_TOKEN.strip(),
+            "Authorization": "JWT "
+            + _get_password("Endgame", "API_Token", modify=kwargs["modify"]).strip(),
             "Content-Type": "application/json",
             "Cache-Control": "no-cache",
         }
@@ -117,4 +116,3 @@ class Client(ThirdPartyInterface):
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         self.logger.warning("Endgame client does not implement static IP-blocking")
         return []
-

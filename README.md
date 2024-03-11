@@ -1,4 +1,5 @@
 # Introduction
+
 This is a framework meant to allow for easy integration of any third-party security vendor. 
 
 Based on various input parameters (details below), the script returns a list of Host/Accounts/Detections to be blocked/unblocked. 
@@ -6,7 +7,6 @@ Based on various input parameters (details below), the script returns a list of 
 The code defines an [abstract class](./third_party_clients/third_party_interface.py) which third-party clients must extend, which allows for easy integration with the workflow implemented by the base script. 
 
 Since adding a new third party integration only requires to extend that class, I'd encourage to use this framework for any new integrations being built. 
-
 
 # Third party integrations
 
@@ -38,8 +38,8 @@ Currently, the following third party integrations are implemented:
 
 Integration-specific documentation can be found in the [relevant folders](./third_party_clients/) of the third party integrations. 
 
-
 # Requirements
+
 Install the python module requirements utilizing pip3:
 
 `pip3 install -r requirements.txt`  
@@ -50,10 +50,13 @@ Install the python module requirements utilizing pip3:
 
 The script supports host, account, and detection based blocking. Parameters defining what host/account/detections get blocked are defined in the [config.py](./config.py) file.
 
+# Secrets Storage
 
-# Getting a Vectra API token. 
+This script utilize the Python Keyring package to securely store secrets locally to where the script is ran.  The script will check the default keyring for the necessary secrets and prompt the user if they are not found. The default configuration is to store the secrets after input. If user desires not to store the secrets, utilize the **--no_store_secrets** option.
 
-You will need to provide a Vectra API token within the [config.py](./config.py) file. To create a token, login into Vectra, go to "My Profile" and click to create an API token. Note that only local accounts can generate API tokens.
+# Getting a Vectra API token for Vectra Detect API (v2).
+
+Vectra Detect API v2 utilizes token based authentication. To create a token, login into Vectra, go to "My Profile" and click to create an API token. Note that only local accounts can generate API tokens.
 
 Vectra API tokens will be linked to the user that created them, and inherit the rights of that user. Any actions done using that API token will also show under the same username in the audit logs. 
 
@@ -65,6 +68,19 @@ You may want to create a separate user for the API integration for audit purpose
 * Read/Write access to tags
 * Read/Write access to Notes & Other User's Notes
 
+# Getting a Vectra API Client ID and Secret Key for Vectra Platform API (v3). 
+
+Access to the Vectra Platform API is done through the creation of an API Client. Creation of an API Client will provide a set of OAuth 2.0 credentials that will be used to gain authorization to the Vectra Platform API. Please note that management of API Clients is restricted to Detect users with the role of “Super Admin”. To create an API client, log into your Detect portal and navigate to Manage > API Clients. From the API Clients page, select ‘Add API Client’ to create a new client. Once created, be sure to record your Client ID and Secret Key for safekeeping. You will need these two pieces of information to obtain an access token from the Vectra Platform API. An access token is required to make requests to all of the Vectra Platform API endpoints.
+
+Vectra API Clients will inherit the rights of the role selected during creation. 
+
+You may want to create a separate role for the API integration for audit purposes, and only give it fine-grained RBAC rights. For the integration to work, the API Client will need:
+* Read access to Hosts
+* Read access to Accounts
+* Read access to Detections
+* Read access to "Manage - Groups"
+* Read/Write access to tags
+* Read/Write access to Notes & Other User's Notes
 
 ## Host-based blocking
 
@@ -81,6 +97,17 @@ Besides this, the _NO_BLOCK_HOST_GROUP_NAME_ Defines a group name from which all
 
 **Important:** when blocking conditions are no longer fulfilled for a host, either because the blocking tag was removed, its score decreased, group membership was revoked, or the specific detection types causing blocking were fixed, the host will be automatically unblocked by the script on the next run. 
 
+## Account-based blocking
+
+The goal of account-based blocking is to disable or otherwise restrict an account to limit its usage by an adversary.
+Currently, the only module supporting this functionality is by calling an external program with the `external_call` module.
+
+1. BLOCK_ACCOUNT_TAG: defines the tag applied to an account which results in the block_account methods being called for the configured clients
+2. NO_BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will not be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
+3. BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
+4. BLOCK_ACCOUNT_THREAT_CERTAINTY: defines a threat and certainty score threshold, above which host will get blocked. The middle variable can be either _and_ or _or_, defining how the threat and certainty conditions are treated.
+5. BLOCK_ACCOUNT_DETECTION_TYPES: this is a list containing specific detection types, which will always result in the account being blocked. 
+6. BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE: minimum Threat and/or Certainty scores for an account with specified detection types before it will be blocked.
 
 ## Detection-based blocking
 
@@ -95,20 +122,6 @@ There are multiple parameters within the [config.py](./config.py) file which def
 1. EXTERNAL_BLOCK_HOST_TC: defines host threat/certainty score above which all detections present on that host will get marked for blocking (or at least any external component present in those detections). 
 2. EXTERNAL_BLOCK_DETECTION_TAG: defines a tag that when set on a detection will cause all external components of that detection to be blocked. 
 3. EXTERNAL_BLOCK_DETECTION_TYPES: this is a list containing specific detection types, which will always have their external components automatically blocked. Any valid detection type will be accepted by the script, but it only makes sense for detections with an external component, thus Botnet, Command&Control or Exfil detections. 
-
-
-## Account-based blocking
-
-The goal of account-based blocking is to disable or otherwise restrict an account to limit its usage by an adversary.
-Currently, the only module supporting this functionality is by calling an external program with the `external_call` module.
-
-1. BLOCK_ACCOUNT_TAG: defines the tag applied to an account which results in the block_account methods being called for the configured clients
-2. NO_BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will not be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
-3. BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
-4. BLOCK_ACCOUNT_THREAT_CERTAINTY: defines a threat and certainty score threshold, above which host will get blocked. The middle variable can be either _and_ or _or_, defining how the threat and certainty conditions are treated.
-5. BLOCK_ACCOUNT_DETECTION_TYPES: this is a list containing specific detection types, which will always result in the account being blocked. 
-6. BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE: minimum Threat and/or Certainty scores for an account with specified detection types before it will be blocked.
-
 
 # Configuring the Third-Party clients used
 
@@ -137,14 +150,14 @@ If one type is not desired, you can comment out the corresponding code blocks:
 
 ```python
 # Those 3 lines handle host-based blocking; comment them out if you don't want it
-hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
-vae.block_hosts(hosts_to_block)
-vae.unblock_hosts(hosts_to_unblock)
+hosts_to_block, hosts_to_unblock = var.get_hosts_to_block_unblock()
+var.block_hosts(hosts_to_block)
+var.unblock_hosts(hosts_to_unblock)
 
 # Those 3 lines handle detection-based blocking; comment them out if you don't want it
-detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
-vae.block_detections(detections_to_block)
-vae.unblock_detections(detections_to_unblock)
+detections_to_block, detections_to_unblock = var.get_detections_to_block_unblock()
+var.block_detections(detections_to_block)
+var.unblock_detections(detections_to_unblock)
 ```
 
 ### Using the external_call module
@@ -199,10 +212,7 @@ flag to run the script in a continuous loop with the pause time configured in th
 
 ### Additional options
 
-#### Keying
-Modules may be modified to utilize API keys or credentials stored in the local system's keying.  Specifying
-the `--keyring` flag will enable this feature for the supported modules.
-
 #### Monitoring for IP changes
+
 Modules may support attempting to re-block a host (re-grooming) if that host's IP has changed since it was originally
 blocked.  To enable re-grooming for supported modules specify the `--groom` flag.

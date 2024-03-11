@@ -1,3 +1,2 @@
-BASE_URL = 'https://workload.<region>.cloudone.trendmicro.com'
-API_KEY = '<api-key>'
+BASE_URL = "https://workload.<region>.cloudone.trendmicro.com"
 VERIFY = False

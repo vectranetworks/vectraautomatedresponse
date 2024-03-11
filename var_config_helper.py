@@ -48,51 +48,57 @@ try:
                 clients = ast.literal_eval(confs[conf])
 
         else:
-            if  conf in ["COGNITO_TOKEN", "COGNITO_CLIENT_ID", "COGNITO_SECRET_KEY", "V3"]:
+            if conf in [
+                "COGNITO_TOKEN",
+                "COGNITO_CLIENT_ID",
+                "COGNITO_SECRET_KEY",
+                "V3",
+            ]:
                 continue
             if conf in ["LOG_FILE"] and confs["LOG_TO_FILE"] == "False":
                 continue
             if (
-                conf in ["SMTP_SERVER", "SMTP_PORT", "SRC_EMAIL", "DST_EMAIL", "SMTP_AUTH"]
+                conf
+                in ["SMTP_SERVER", "SMTP_PORT", "SRC_EMAIL", "DST_EMAIL", "SMTP_AUTH"]
                 and confs["SEND_EMAIL"] == "False"
             ):
                 continue
             elif (
-                    conf in ["SMTP_USER", "SMTP_PASSWORD"]
-                    and confs["SMTP_AUTH"] == "False"
-                ):
-                    continue
+                conf in ["SMTP_USER", "SMTP_PASSWORD"] and confs["SMTP_AUTH"] == "False"
+            ):
+                continue
             if (
-                conf in ["SYSLOG_SERVER", "SYSLOG_PORT", "SYSLOG_PROTO", "SYSLOG_FORMAT"]
+                conf
+                in ["SYSLOG_SERVER", "SYSLOG_PORT", "SYSLOG_PROTO", "SYSLOG_FORMAT"]
                 and confs["SEND_SYSLOG"] == "False"
             ):
                 continue
 
             if conf == "COGNITO_URL":
                 arg = questionary.text(
-                        f"Configure {conf} (current: {confs[conf]}): "
-                    ).unsafe_ask()
+                    f"Configure {conf} (current: {confs[conf]}): "
+                ).unsafe_ask()
                 if arg != "":
-                    confs[conf] = f'\"{arg}\"'
+                    confs[conf] = f'"{arg}"'
                 if re.match(".*\/\/\d{12}\.uw2.*", confs[conf], re.IGNORECASE):
                     confs["COGNITO_TOKEN"] = '""'
                     arg = questionary.text(
                         f"Configure COGNITO_CLIENT_ID (current: {confs['COGNITO_CLIENT_ID']}): "
                     ).unsafe_ask()
                     if arg != "":
-                        confs["COGNITO_CLIENT_ID"] = f'\"{arg}\"'
+                        confs["COGNITO_CLIENT_ID"] = f'"{arg}"'
                     arg = questionary.text(
                         f"Configure COGNITO_SECRET_KEY (current: {confs['COGNITO_SECRET_KEY']}): "
                     ).unsafe_ask()
                     if arg != "":
-                        confs["COGNITO_SECRET_KEY"] = f'\"{arg}\"'
+                        confs["COGNITO_SECRET_KEY"] = f'"{arg}"'
                     confs["V3"] = True
                 else:
                     arg = questionary.text(
                         f"Configure COGNITO_TOKEN (current: {confs['COGNITO_TOKEN']}): "
                     ).unsafe_ask()
                     if arg != "":
-                        confs["COGNITO_TOKEN"] = f'\"{arg}\"'
+                        confs["COGNITO_TOKEN"] = f'"{arg}"'
                     confs["COGNITO_CLIENT_ID"] = '""'
                     confs["COGNITO_SECRET_KEY"] = '""'
                     confs["V3"] = False

@@ -6,8 +6,11 @@ import requests
 from requests import HTTPError
 from third_party_clients.fortinet.fortinet_config import (
     EXTERNAL_ADDRESS_GROUP,
-    FIREWALLS,
     INTERNAL_ADDRESS_GROUP,
+    IP,
+    PORT,
+    VDOM,
+    VERIFY,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -16,6 +19,8 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+
+from vectra_automated_response import _get_password
 
 
 @unique
@@ -130,21 +135,33 @@ class FortiGate:
 
 
 class Client(ThirdPartyInterface):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "Fortinet Client"
         self.logger = logging.getLogger()
         self.internal_block_policy_name = INTERNAL_ADDRESS_GROUP
         self.external_block_policy_name = EXTERNAL_ADDRESS_GROUP
+        if len(IP) == len(PORT) == len(VDOM) == len(VERIFY):
+            firewalls = zip(IP, PORT, VDOM)
+        else:
+            self.logger.error(
+                f"Missing inputs for firewall configuration. Check fortinet_config.py \
+                    IP length is {len(IP)}, \
+                    PORT length is {len(PORT)}, \
+                    VDOM length is {len(VDOM)}, \
+                    VERIFY length is {len(VERIFY)}."
+            )
         try:
             self.firewalls = []
-            for auth in FIREWALLS:
+            for firewall in firewalls:
                 self.firewalls.append(
                     FortiGate(
-                        ipaddr=auth["IP"],
-                        port=auth.get("PORT", 443),
-                        token=auth["TOKEN"],
-                        vdom=auth.get("VDOM", "root"),
-                        verify=auth.get("VERIFY", False),
+                        ipaddr=firewall[0],
+                        port=firewall[1],
+                        token=_get_password(
+                            "Fortinet", firewall[0], modify=kwargs["modify"]
+                        ),
+                        vdom=firewall[2],
+                        verify=firewall[3],
                     )
                 )
         except KeyError as e:
@@ -324,4 +341,3 @@ class Client(ThirdPartyInterface):
         r = firewall.update_address_group(group_name, member_list)
         if r.status_code == 500:
             raise HTTPError("Could not update group {}".format(group_name))
-

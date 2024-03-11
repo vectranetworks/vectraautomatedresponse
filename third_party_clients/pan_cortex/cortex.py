@@ -6,9 +6,7 @@ from datetime import datetime
 
 import requests
 from third_party_clients.pan_cortex.cortex_config import (
-    CORTEX_API_TOKEN,
     CORTEX_API_TYPE,
-    CORTEX_KEY_ID,
     CORTEX_URL,
 )
 from third_party_clients.third_party_interface import (
@@ -18,6 +16,8 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+
+from vectra_automated_response import _get_password
 
 
 def request_error_handler(func):
@@ -58,7 +58,7 @@ class Client(ThirdPartyInterface):
         # Remove the last ampersand and return
         return url_param[:-1]
 
-    def __init__(self, url=None):
+    def __init__(self, **kwargs):
         self.name = "Cortex Client"
         """
         Initialize PAN Cortex client
@@ -69,8 +69,10 @@ class Client(ThirdPartyInterface):
         """
         self.logger = logging.getLogger()
         self.cortex_url = CORTEX_URL
-        self.cortex_api_token = CORTEX_API_TOKEN
-        self.cortex_key_id = CORTEX_KEY_ID
+        self.cortex_api_token = _get_password(
+            "Cortex", "API_Token", modify=kwargs["modify"]
+        )
+        self.cortex_key_id = _get_password("Cortex", "Key_ID", modify=kwargs["modify"])
         self.headers = ""
 
         # Instantiate parent class
@@ -79,8 +81,8 @@ class Client(ThirdPartyInterface):
     def get_headers(self):
         if CORTEX_API_TYPE == "standard":
             self.headers = {
-                "x-xdr-auth-id": CORTEX_KEY_ID,
-                "Authorization": CORTEX_API_TOKEN,
+                "x-xdr-auth-id": self.cortex_key_id,
+                "Authorization": self.cortex_api_token,
                 "Content-Type": "application/json",
             }
         elif CORTEX_API_TYPE == "advanced":
@@ -94,7 +96,7 @@ class Client(ThirdPartyInterface):
             # Get the current timestamp as milliseconds.
             timestamp = int(datetime.utcnow().timestamp()) * 1000
             # Generate the auth key:
-            auth_key = CORTEX_KEY_ID + nonce + timestamp
+            auth_key = self.cortex_key_id + nonce + timestamp
             # Convert to bytes object
             auth_key = auth_key.encode("utf-8")
             # Calculate sha256:
@@ -103,7 +105,7 @@ class Client(ThirdPartyInterface):
             self.headers = {
                 "x-xdr-timestamp": str(timestamp),
                 "x-xdr-nonce": nonce,
-                "x-xdr-auth-id": CORTEX_KEY_ID,
+                "x-xdr-auth-id": self.cortex_key_id,
                 "Authorization": api_key_hash,
             }
 
@@ -161,7 +163,7 @@ class Client(ThirdPartyInterface):
     def _quarantaine_endpoint(self, endpoint_id):
         """
         Put an endpoint in the Quarantaine policy based on its MAC address
-        :param mac_address: MAC address of the endpoint to quarantain - required
+        :param mac_address: MAC address of the endpoint to quarantaine - required
         :rtype: None
         """
         # We need first to put the endpoint in a temporary policy to make the port bounce

@@ -1,9 +1,6 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = "<brain_url>"
-COGNITO_TOKEN = "<token>"
-COGNITO_CLIENT_ID = "<client_id>"
-COGNITO_SECRET_KEY = "<secret_key>"
+COGNITO_URL = ""
 V3 = False
 LOG_TO_FILE = False
 LOG_FILE = "var.log"
@@ -12,7 +9,7 @@ SLEEP_MINUTES = 5
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements']
-THIRD_PARTY_CLIENTS = ['test_client']
+THIRD_PARTY_CLIENTS = ["test_client"]
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
@@ -77,7 +74,6 @@ SRC_EMAIL = "example@email.com"
 DST_EMAIL = "example@email.com"
 SMTP_AUTH = False
 SMTP_USER = "user"
-SMTP_PASSWORD = "password"
 
 # Syslog Configuration
 SEND_SYSLOG = False

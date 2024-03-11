@@ -9,18 +9,16 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 from third_party_clients.ubiquiti.ubiquiti_config import (
-    WATCHGAURD_USER,
-    WATCHGUARD_ACCOUNT_ID,
-    WATCHGUARD_API_KEY,
-    WATCHGUARD_PASSWORD,
     WATCHGUARD_URL,
 )
+
+from vectra_automated_response import _get_password
 
 
 def request_error_handler(func):
     """
     Decorator to handle request results and raise if not HTTP success
-    :rtype: Requests.Reponse or Exception
+    :rtype: Requests.Response or Exception
     """
 
     def request_handler(self, *args, **kwargs):
@@ -73,21 +71,29 @@ class Client(ThirdPartyInterface):
         # Remove the last ampersand and return
         return url_param[:-1]
 
-    def __init__(self):
-        self.name = "WatchGaurd Client"
+    def __init__(self, **kwargs):
+        self.name = "WatchGuard Client"
         """
         Initialize Watchguard client
-        :param url: FQDN or IP of UBIQUITI appliance - required
+        :param url: FQDN or IP of WatchGuard appliance - required
         :param user: Username to authenticate to ISR - required
-        :param password: Password to authenticate to UBIQUITI - required
+        :param password: Password to authenticate to WatchGuard - required
         :param verify: Verify SSL (default: False) - optional
         """
-        self.watchguard_account_id = WATCHGUARD_ACCOUNT_ID
-        self.watchguard_api_key = WATCHGUARD_API_KEY
-        self.watchguard_password = WATCHGUARD_PASSWORD
+        self.watchguard_account_id = _get_password(
+            "WatchGuard", "Account_ID", modify=kwargs["modify"]
+        )
+        self.watchguard_api_key = _get_password(
+            "WatchGuard", "API_Key", modify=kwargs["modify"]
+        )
+        self.watchguard_password = _get_password(
+            "WatchGuard", "Password", modify=kwargs["modify"]
+        )
         self.watchguard_url = WATCHGUARD_URL
-        self.watchgaurd_user = WATCHGAURD_USER
-        self.auth = (self.watchgaurd_user, self.watchguard_password)
+        self.watchguard_user = _get_password(
+            "WatchGuard", "Username", modify=kwargs["modify"]
+        )
+        self.auth = (self.watchguard_user, self.watchguard_password)
         self.verify = False
 
         self.headers = (
@@ -155,12 +161,12 @@ class Client(ThirdPartyInterface):
         return device_id
 
     def groom_host(self, host) -> dict:
-        self.logger.warning("UBIQUITI client does not implement host grooming")
+        self.logger.warning("This client does not implement host grooming")
         return []
 
     def block_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn("UBIQUITI client does not implement detection-based blocking")
+        self.logger.warn("This client does not implement detection-based blocking")
         return []
 
     def unblock_detection(self, detection):
@@ -185,8 +191,8 @@ class Client(ThirdPartyInterface):
 
     def _quarantine_endpoint(self, device_id):
         """
-        Isolate an enpoint based on the device_id
-        :param device_id: Device ID of the endpoint to quarantain - required
+        Isolate an endpoint based on the device_id
+        :param device_id: Device ID of the endpoint to quarantaine - required
         :rtype: None
         """
         suffix = f"/rest/endpoint-security/management/api/v1/accounts/{self.watchguard_account_id}/devices/isolation"
@@ -205,8 +211,8 @@ class Client(ThirdPartyInterface):
 
     def _unquarantine_endpoint(self, device_id):
         """
-        Unisolate an enpoint based on the device_id
-        :param device_id: Device ID of the endpoint to quarantain - required
+        Unisolate an endpoint based on the device_id
+        :param device_id: Device ID of the endpoint to quarantaine - required
         :rtype: None
         """
         suffix = f"/rest/endpoint-security/management/api/v1/accounts/{self.watchguard_account_id}/devices/noisolation"

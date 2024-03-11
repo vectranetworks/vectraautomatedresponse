@@ -10,13 +10,10 @@ import urllib3
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from third_party_clients.cisco_pxgrid.pxgrid_config import (
     PXGRID_APPLIANCE_LIST,
+    PXGRID_CA_BUNDLE,
     PXGRID_CERT,
     PXGRID_KEY,
-    PXGRID_KEY_PASSWORD,
-    PXGRID_PASSWORD,
     PXGRID_PORT,
-    PXGRID_CA_BUNDLE,
-    PXGRID_USERNAME,
     PXGRID_VERIFY,
     QUARANTAINE_POLICY,
 )
@@ -27,6 +24,8 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+
+from vectra_automated_response import _get_password
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -66,15 +65,22 @@ class HTTPException(Exception):
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.__ssl_context = None
         self.pxgrid_appliance_list = PXGRID_APPLIANCE_LIST
         self.pxgrid_port = PXGRID_PORT
-        self.username = PXGRID_USERNAME
-        self.password = PXGRID_PASSWORD
+        self.username = _get_password(
+            "Cisco_PxGrid", "Username", modify=kwargs["modify"]
+        )
+        self.password = _get_password(
+            "Cisco_PxGrid", "Password", modify=kwargs["modify"]
+        )
         self.clientcert = PXGRID_CERT
         self.clientkey = PXGRID_KEY
-        self.clientkey_password = PXGRID_KEY_PASSWORD
+        if self.clientkey != "":
+            self.clientkey_password = _get_password(
+                "Cisco_PxGrid", "Priv_Key_Pass", modify=kwargs["modify"]
+            )
         self.ca_bundle = PXGRID_CA_BUNDLE
         self.verify = PXGRID_VERIFY
         self.quarantine_policy = QUARANTAINE_POLICY
@@ -127,7 +133,7 @@ class Config:
                 )
             if self.ca_bundle != "":
                 self.__ssl_context.load_verify_locations(cafile=self.ca_bundle)
-            #elif not self.verify:
+            # elif not self.verify:
             elif not self.get_verify():
                 self.__ssl_context.check_hostname = False
                 self.__ssl_context.verify_mode = ssl.CERT_NONE
@@ -196,7 +202,7 @@ class Client(ThirdPartyInterface):
         # Remove the last ampersand and return
         return url_param[:-1]
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.name = "PxGrid Client"
         """
         Initialize Cisco PXGRID client
@@ -206,19 +212,19 @@ class Client(ThirdPartyInterface):
         :param verify: Verify SSL (default: False) - optional
         """
         self.logger = logging.getLogger("PxGrid")
-        self.config = Config()
+        self.config = Config(modify=kwargs["modify"])
         self.pxgrid = PxgridControl(config=self.config)
         self.enabled = False
         self.appliance_list = self.config.get_pxgrid_appliance_list()
-        
-        while not self.enabled: 
+
+        while not self.enabled:
             for appliance in self.appliance_list:
                 if self.pxgrid.account_activate(appliance)["accountState"] == "ENABLED":
                     self.enabled = True
                     self.appliance = appliance
                     break
                 else:
-                    time.sleep(60/len(self.appliance_list))
+                    time.sleep(60 / len(self.appliance_list))
 
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
@@ -334,7 +340,9 @@ class Client(ThirdPartyInterface):
         :param policy_name: name of the policy to add the endpoint to
         :rtype: Requests.Response
         """
-        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.config.anc")
+        service_lookup_response = self.pxgrid.service_lookup(
+            self.appliance, "com.cisco.ise.config.anc"
+        )
         services = service_lookup_response["services"]
         for service in services:
             node_name = service["nodeName"]
@@ -350,14 +358,19 @@ class Client(ThirdPartyInterface):
                 auth=(self.config.username, secret),
                 payload=payload,
             )
-            
+
             self.logger.debug(f"Block response: {response.json()}")
             if response.status_code == 200:
                 if response.json()["status"] != "FAILURE":
                     return True
-                elif response.json()["failureReason"] == "mac address is already associated with this policy":
+                elif (
+                    response.json()["failureReason"]
+                    == "mac address is already associated with this policy"
+                ):
                     return True
-        self.logger.error(f"Failed to add host to policy {policy_name}. Reason: {response.json()['failureReason']}")
+        self.logger.error(
+            f"Failed to add host to policy {policy_name}. Reason: {response.json()['failureReason']}"
+        )
         return False
 
     def _rem_mac_from_policy(self, mac_address):
@@ -367,7 +380,9 @@ class Client(ThirdPartyInterface):
         :rtype: Requests.Response
         """
 
-        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.config.anc")
+        service_lookup_response = self.pxgrid.service_lookup(
+            self.appliance, "com.cisco.ise.config.anc"
+        )
         services = service_lookup_response["services"]
         for service in services:
             node_name = service["nodeName"]
@@ -388,7 +403,9 @@ class Client(ThirdPartyInterface):
             self.logger.debug(f"Unblock response: {response.json()}")
             if response.status_code == 200 and response.json()["status"] != "FAILURE":
                 return True
-        self.logger.error("Failed to remove host {} from blocking policy.".format(mac_address))
+        self.logger.error(
+            "Failed to remove host {} from blocking policy.".format(mac_address)
+        )
         return False
 
     def _get_mac_from_ip(self, ip_address):
@@ -398,7 +415,9 @@ class Client(ThirdPartyInterface):
         :rtype: string
         """
         mac_addresses = []
-        service_lookup_response = self.pxgrid.service_lookup(self.appliance, "com.cisco.ise.session")
+        service_lookup_response = self.pxgrid.service_lookup(
+            self.appliance, "com.cisco.ise.session"
+        )
         services = service_lookup_response["services"]
         for service in services:
             node_name = service["nodeName"]
@@ -417,7 +436,11 @@ class Client(ThirdPartyInterface):
 
             sessions = response.json()["sessions"]
             for session in sessions:
-                if session["nasIpAddress"] == ip_address:
-                    mac_addresses.append(session["macAddress"])
+                self.logger.debug(f"_get_mac_from_ip: {session}")
+                try:
+                    if ip_address in session["ipAddresses"]:
+                        mac_addresses.append(session["macAddress"])
+                except KeyError:
+                    pass
 
             return mac_addresses
