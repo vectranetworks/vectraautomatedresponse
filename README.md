@@ -125,9 +125,9 @@ There are multiple parameters within the [config.py](./config.py) file which def
 
 # Configuring the Third-Party clients used
 
-Users need to configure which third-party clients they intend the script to use. This configuration needs to be done directly in the [config.py](./config.py) file. The user can manually update the [config.py](./config.py) and the [third_party_clients/third_party_client/third_party_client_config.py], or utilize the [var_helper.py](./var_helper.py) script.  To run the script:
+Users need to configure which third-party clients they intend the script to use. This configuration needs to be done directly in the [config.py](./config.py) file. The user can manually update the [config.py](./config.py) and the [third_party_clients/third_party_client/third_party_client_config.py], or utilize the [var_config_helper.py](./var_config_helper.py) script.  To run the script:
 
-`python3 var_helper.py`
+`python3 var_config_helper.py`
 
 The script will pull all of the pertinent variables and present them to the user for configuration.  When the script is complete, all configurations will be written to the appropriate configuration file(s).
 
