@@ -199,11 +199,17 @@ class VectraDetection:
         self.tags = self._get_external_tags(detection["tags"])
         self.blocked_elements = self._get_blocked_elements(detection["tags"])
 
-    def _get_host_id(self,detection):
-        return detection.get("src_host", {}).get("id")
+    def _get_host_id(self, detection):
+        try:
+            return detection.get("src_host", {}).get("id")
+        except AttributeError:
+            return
 
-    def _get_account_id(self,detection):
-        return detection.get("src_account", {}).get("id")
+    def _get_account_id(self, detection):
+        try:
+            return detection.get("src_account", {}).get("id")
+        except AttributeError:
+            return
 
     def _get_dst_ips(self, detection):
         dst_ips = set()
