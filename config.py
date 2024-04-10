@@ -1,10 +1,11 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = ""
-V3 = False
+COGNITO_URL = [""]
 LOG_TO_FILE = False
 LOG_FILE = "var.log"
 SLEEP_MINUTES = 5
+# All brains must use the same API version. Run a different instance of this script for each API version
+V3 = False
 # Available options: ['bitdefender', 'cisco_amp', 'cisco_fmc', 'cisco_ise',
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
@@ -22,7 +23,7 @@ BLOCK_END_TIME = 0
 
 ### INTERNAL IP BLOCKING
 # Tag that will cause a host to be blocked; remove the tag to unblock the host
-BLOCK_HOST_TAG = "block"
+BLOCK_HOST_TAG = "vectra_host_block"
 # Host group for which member will NEVER be blocked.
 NO_BLOCK_HOST_GROUP_NAME = "NoBlock"
 # Host group for which all members will be blocked
@@ -50,7 +51,7 @@ STATIC_BLOCK_DESTINATION_IPS = "static_dst_ips_to_block.txt"
 
 ### ACCOUNT BLOCKING
 # Tag that will cause an account to be blocked; remove the tag to unblock the host
-BLOCK_ACCOUNT_TAG = "block"
+BLOCK_ACCOUNT_TAG = "vectra_account_block"
 # Account group for which member will NEVER be blocked.
 NO_BLOCK_ACCOUNT_GROUP_NAME = "NoBlock"
 # Account group for which all members will be blocked
