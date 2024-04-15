@@ -25,6 +25,7 @@ from config import (
     BLOCK_ACCOUNT_GROUP_NAME,
     BLOCK_ACCOUNT_TAG,
     BLOCK_ACCOUNT_THREAT_CERTAINTY,
+    BLOCK_ACCOUNT_URGENCY,
     BLOCK_DAYS,
     BLOCK_END_TIME,
     BLOCK_HOST_DETECTION_TYPES,
@@ -32,6 +33,7 @@ from config import (
     BLOCK_HOST_GROUP_NAME,
     BLOCK_HOST_TAG,
     BLOCK_HOST_THREAT_CERTAINTY,
+    BLOCK_HOST_URGENCY,
     BLOCK_START_TIME,
     COGNITO_URL,
     DST_EMAIL,
@@ -182,7 +184,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :param verify: verify SSL - optional
         """
         if re.match("^http[s]?://\d{12}.uw2.portal.vectra.ai.*$", url, re.IGNORECASE):
-            super().__init__(url, client_id, secret_key)
+            super().__init__(url, client_id, secret_key, verify)
         else:
             super().__init__(url, token, verify)
         self.logger = logging.getLogger("VectraClient")
@@ -254,95 +256,143 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         except KeyError:
             raise HTTPError(page.text)
 
-    def get_scored_hosts(self, tc_tuple) -> HostDict:
+    def get_scored_hosts(self, tc_tuple, urgency_score) -> HostDict:
         """
         Get a dictionary of all hosts above given threat/certainty threshold
         :param t_score_gte: threat score threshold
         :param c_score_gte: certainty score threshold
+        :param urgency_score: urgency score threshold for V3 only
         :rtype: HostDict
         """
         hosts = {}
-        try:
-            t_score_gte, condition, c_score_gte = tc_tuple
-            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
-                raise ValueError
-            if condition not in ["and", "or"]:
-                raise ValueError
-        except ValueError:
-            self.logger.error(
-                "Invalid Threat/Certainty tuple provided in the BLOCK_HOST_THREAT_CERTAINTY parameter"
-            )
-            exit(99)
+        if tc_tuple is not None:
+            try:
+                t_score_gte, condition, c_score_gte = tc_tuple
+                if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+                    raise ValueError
+                if condition not in ["and", "or"]:
+                    raise ValueError
+            except ValueError:
+                self.logger.error(
+                    "Invalid Threat/Certainty tuple provided in the BLOCK_HOST_THREAT_CERTAINTY parameter"
+                )
+                exit(99)
 
-        if condition == "and":
-            r = self.get_all_hosts(
-                t_score_gte=t_score_gte,
-                c_score_gte=c_score_gte,
-            )
-            for page in r:
-                if page.status_code not in [200, 201, 204]:
-                    raise HTTPException(page)
-                for host in page.json().get("results", []):
-                    hosts[host["id"]] = VectraHost(host)
+            if condition == "and":
+                r = self.get_all_hosts(
+                    t_score_gte=t_score_gte,
+                    c_score_gte=c_score_gte,
+                )
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for host in page.json().get("results", []):
+                        hosts[host["id"]] = VectraHost(host)
+            else:
+                r = self.get_all_hosts(t_score_gte=t_score_gte)
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for host in page.json().get("results", []):
+                        hosts[host["id"]] = VectraHost(host)
+                r = self.get_all_hosts(c_score_gte=c_score_gte)
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for host in page.json().get("results", []):
+                        hosts[host["id"]] = VectraHost(host)
+
         else:
-            r = self.get_all_hosts(t_score_gte=t_score_gte)
+            try:
+                if not isinstance(urgency_score, int):
+                    raise ValueError
+            except ValueError:
+                self.logger.error(
+                    "Invalid Urgency Score provided in the BLOCK_HOST_URGENCY parameter"
+                )
+                exit(99)
+            r = self.get_all_entities(type="host", ordering="-urgency_score")
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
-                for host in page.json().get("results", []):
-                    hosts[host["id"]] = VectraHost(host)
-            r = self.get_all_hosts(c_score_gte=c_score_gte)
-            for page in r:
-                if page.status_code not in [200, 201, 204]:
-                    raise HTTPException(page)
-                for host in page.json().get("results", []):
-                    hosts[host["id"]] = VectraHost(host)
+                for entity in page.json().get("results", []):
+                    if entity["urgency_score"] < urgency_score:
+                        return hosts
+                    elif entity["type"] == "host":
+                        if entity["urgency_score"] >= urgency_score:
+                            host = self.get_host_by_id(host_id=entity["id"]).json()
+                            hosts[entity["id"]] = VectraHost(host)
 
         return hosts
 
-    def get_scored_accounts(self, tc_tuple) -> AccountDict:
+    def get_scored_accounts(self, tc_tuple, urgency_score) -> AccountDict:
         """
         Get a dictionary of all accounts above given threat/certainty threshold
         :param t_score_gte: threat score threshold
         :param c_score_gte: certainty score threshold
+        :param urgency_score: urgency score threshold for V3 only
         :rtype: AccountDict
         """
         accounts = {}
-        try:
-            t_score_gte, condition, c_score_gte = tc_tuple
-            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
-                raise ValueError
-            if condition not in ["and", "or", "AND", "OR"]:
-                raise ValueError
-        except ValueError:
-            self.logger.error(
-                "Invalid Threat/Certainty tuple provided in the BLOCK_ACCOUNT_THREAT_CERTAINTY parameter"
-            )
-            exit(99)
+        if tc_tuple is not None:
+            try:
+                t_score_gte, condition, c_score_gte = tc_tuple
+                if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+                    raise ValueError
+                if condition not in ["and", "or", "AND", "OR"]:
+                    raise ValueError
+            except ValueError:
+                self.logger.error(
+                    "Invalid Threat/Certainty tuple provided in the BLOCK_ACCOUNT_THREAT_CERTAINTY parameter"
+                )
+                exit(99)
 
-        if condition == "and":
-            r = self.get_all_accounts(
-                t_score_gte=t_score_gte,
-                c_score_gte=c_score_gte,
-            )
-            for page in r:
-                if page.status_code not in [200, 201, 204]:
-                    raise HTTPException(page)
-                for account in page.json().get("results", []):
-                    accounts[account["id"]] = VectraAccount(account)
+            if condition == "and":
+                r = self.get_all_accounts(
+                    t_score_gte=t_score_gte,
+                    c_score_gte=c_score_gte,
+                )
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for account in page.json().get("results", []):
+                        accounts[account["id"]] = VectraAccount(account)
+            else:
+                r = self.get_all_accounts(t_score_gte=t_score_gte)
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for account in page.json().get("results", []):
+                        accounts[account["id"]] = VectraAccount(account)
+                r = self.get_all_accounts(c_score_gte=c_score_gte)
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for account in page.json().get("results", []):
+                        accounts[account["id"]] = VectraAccount(account)
+
         else:
-            r = self.get_all_accounts(t_score_gte=t_score_gte)
+            try:
+                if not isinstance(urgency_score, int):
+                    raise ValueError
+            except ValueError:
+                self.logger.error(
+                    "Invalid Urgency Score provided in the BLOCK_ACCOUNT_URGENCY parameter"
+                )
+                exit(99)
+            r = self.get_all_entities(type="account", ordering="-urgency_score")
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
-                for account in page.json().get("results", []):
-                    accounts[account["id"]] = VectraAccount(account)
-            r = self.get_all_accounts(c_score_gte=c_score_gte)
-            for page in r:
-                if page.status_code not in [200, 201, 204]:
-                    raise HTTPException(page)
-                for account in page.json().get("results", []):
-                    accounts[account["id"]] = VectraAccount(account)
+                for entity in page.json().get("results", []):
+                    if entity["urgency_score"] < urgency_score:
+                        return accounts
+                    elif entity["type"] == "account":
+                        if entity["urgency_score"] >= urgency_score:
+                            account = self.get_account_by_id(
+                                account_id=entity["id"]
+                            ).json()
+                            accounts[entity["id"]] = VectraAccount(account)
 
         return accounts
 
@@ -489,6 +539,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         self,
         block_tag: Optional[str] = None,
         min_tc_score: Optional[tuple] = None,
+        min_urgency_score: Optional[int] = None,
         block_host_group_name: Optional[str] = None,
         block_host_detection_types: list = [],
         block_host_detections_types_min_host_tc: tuple = (0, "and", 0),
@@ -497,13 +548,23 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         Get all host IDs which should be blocked given the parameters.
         :param block_tag: tag defining hosts that need to be blocked - optional
         :param min_tc_score: tuple of (threat, certainty) to query hosts exceeding this threshold - optional
+        :param min_urgency_score: urgency to query hosts exceeding this threshold - optional
         :param block_host_detection_types: list of detections types which if present on a host will cause the host to be blocked - optional
         :rtype: HostDict
         """
+
         tagged_hosts = self.get_tagged_hosts(tag=block_tag) if block_tag else {}
+
+        if V3:
+            if min_urgency_score is not None:
+                min_tc_score = None
+        else:
+            min_urgency_score = None
         scored_hosts = (
-            self.get_scored_hosts(tc_tuple=min_tc_score)
-            if isinstance(min_tc_score, tuple)
+            self.get_scored_hosts(
+                tc_tuple=min_tc_score, urgency_score=min_urgency_score
+            )
+            if isinstance(min_tc_score, tuple) or isinstance(min_urgency_score, int)
             else {}
         )
         group_members = self.get_hosts_in_group(group_name=block_host_group_name)
@@ -525,6 +586,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         self,
         block_tag: Optional[str] = None,
         min_tc_score: Optional[tuple] = None,
+        min_urgency_score: Optional[int] = None,
         block_account_group_name: Optional[str] = None,
         block_account_detection_types: list = [],
         block_account_detections_types_min_account_tc: tuple = (0, "and", 0),
@@ -541,9 +603,16 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: AccountDict
         """
         tagged_accounts = self.get_tagged_accounts(tag=block_tag) if block_tag else {}
+        if V3:
+            if min_urgency_score is not None:
+                min_tc_score = None
+        else:
+            min_urgency_score = None
         scored_accounts = (
-            self.get_scored_accounts(tc_tuple=min_tc_score)
-            if isinstance(min_tc_score, tuple)
+            self.get_scored_accounts(
+                tc_tuple=min_tc_score, urgency_score=min_urgency_score
+            )
+            if isinstance(min_tc_score, tuple) or isinstance(min_urgency_score, int)
             else {}
         )
         group_members = self.get_accounts_in_group(group_name=block_account_group_name)
@@ -680,7 +749,9 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
                     )
         return detections
 
-    def get_detections_on_scored_host(self, min_host_tc_score: tuple) -> DetectionDict:
+    def get_detections_on_scored_host(
+        self, min_host_tc_score: tuple, min_urgency_score: int
+    ) -> DetectionDict:
         """
         Get a dictionary of all detections present on hosts exceeding the threat/certainty threshold..
         :param host_t_score_gte: min threat score of hosts to match
@@ -688,14 +759,16 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: DetectionDict
         """
         detections = {}
-        hosts = self.get_scored_hosts(tc_tuple=min_host_tc_score)
+        hosts = self.get_scored_hosts(
+            tc_tuple=min_host_tc_score, urgency_score=min_urgency_score
+        )
         # iterate through the matching host IDs
         for host_id in hosts.keys():
             detections.update(self.get_detections_on_host(host_id=host_id))
         return detections
 
     def get_detections_on_scored_accounts(
-        self, min_account_tc_score: tuple
+        self, min_account_tc_score: tuple, min_urgency_score: int
     ) -> DetectionDict:
         """
         Get a dictionary of all detections present on accounts exceeding the threat/certainty threshold..
@@ -703,7 +776,9 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: DetectionDict
         """
         detections = {}
-        accounts = self.get_scored_accounts(tc_tuple=min_account_tc_score)
+        accounts = self.get_scored_accounts(
+            tc_tuple=min_account_tc_score, urgency_score=min_urgency_score
+        )
         # iterate through the matching host IDs
         for account_id in accounts.keys():
             detections.update(self.get_detections_on_account(account_id=account_id))
@@ -728,6 +803,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         block_tag: Optional[str] = None,
         detection_types_to_block: Optional[list] = None,
         min_host_tc_score: Optional[tuple] = None,
+        min_urgency_score: int = None,
     ) -> DetectionDict:
         """
         Get a dict of all detection IDs which should be blocked given the parameters. 
@@ -746,14 +822,17 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
             else {}
         )
         detections_of_scored_hosts = (
-            self.get_detections_on_scored_host(min_host_tc_score=min_host_tc_score)
-            if min_host_tc_score
+            self.get_detections_on_scored_host(
+                min_host_tc_score=min_host_tc_score, min_urgency_score=min_urgency_score
+            )
+            if min_host_tc_score or min_urgency_score
             else {}
         )
         return {**tagged_detections, **typed_detections, **detections_of_scored_hosts}
 
 
 class VectraAutomatedResponse(object):
+
     def __init__(
         self,
         brain: str,
@@ -762,7 +841,9 @@ class VectraAutomatedResponse(object):
         block_host_tag: Optional[str],
         block_account_tag: Optional[str],
         block_host_tc_score: tuple,
+        block_host_urgency_score: Optional[int],
         block_account_tc_score: tuple,
+        block_account_urgency_score: Optional[int],
         block_host_group_name: Optional[str],
         block_account_group_name: Optional[str],
         block_host_detection_types: list,
@@ -783,6 +864,7 @@ class VectraAutomatedResponse(object):
         # Internal (un)blocking variables
         self.block_host_tag = block_host_tag
         self.block_host_tc_score = block_host_tc_score
+        self.block_host_urgency_score = block_host_urgency_score
         self.block_host_group_name = block_host_group_name
         self.block_host_detection_types = block_host_detection_types
         self.block_host_detections_types_min_host_tc = (
@@ -791,6 +873,7 @@ class VectraAutomatedResponse(object):
         self.no_block_host_group_name = no_block_host_group_name
         self.block_account_tag = block_account_tag
         self.block_account_tc_score = block_account_tc_score
+        self.block_account_urgency_score = block_account_urgency_score
         self.block_account_group_name = block_account_group_name
         self.block_account_detection_types = block_account_detection_types
         self.block_account_detections_types_min_account_tc = (
@@ -841,6 +924,7 @@ class VectraAutomatedResponse(object):
         matching_hosts = self.vectra_api_client.get_hosts_to_block(
             block_tag=self.block_host_tag,
             min_tc_score=self.block_host_tc_score,
+            min_urgency_score=self.block_host_urgency_score,
             block_host_group_name=self.block_host_group_name,
             block_host_detection_types=self.block_host_detection_types,
             block_host_detections_types_min_host_tc=self.block_host_detections_types_min_host_tc,
@@ -948,6 +1032,7 @@ class VectraAutomatedResponse(object):
         matching_accounts = self.vectra_api_client.get_accounts_to_block(
             block_tag=self.block_account_tag,
             min_tc_score=self.block_account_tc_score,
+            min_urgency_score=self.block_account_urgency_score,
             block_account_group_name=self.block_account_group_name,
             block_account_detection_types=self.block_account_detection_types,
             block_account_detections_types_min_account_tc=self.block_account_detections_types_min_account_tc,
@@ -1671,7 +1756,9 @@ def main(args, vectra_api_client, third_party_clients):
         block_host_tag=BLOCK_HOST_TAG,
         block_account_tag=BLOCK_ACCOUNT_TAG,
         block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
+        block_host_urgency_score=BLOCK_HOST_URGENCY,
         block_account_tc_score=BLOCK_ACCOUNT_THREAT_CERTAINTY,
+        block_account_urgency_score=BLOCK_ACCOUNT_URGENCY,
         block_host_group_name=BLOCK_HOST_GROUP_NAME,
         block_account_group_name=BLOCK_ACCOUNT_GROUP_NAME,
         block_host_detection_types=BLOCK_HOST_DETECTION_TYPES,

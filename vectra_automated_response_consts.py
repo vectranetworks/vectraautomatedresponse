@@ -26,9 +26,14 @@ class VectraHost:
             if host.get("last_seen") is not None
             else datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         )
-        self.last_seen_ts_utc = datetime.datetime.strptime(
-            self.last_seen, "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).timestamp()
+        try:
+            self.last_seen_ts_utc = datetime.datetime.strptime(
+                self.last_seen, "%Y-%m-%dT%H:%M:%S.%fZ"
+            ).timestamp()
+        except ValueError:
+            self.last_seen_ts_utc = datetime.datetime.strptime(
+                self.last_seen, "%Y-%m-%dT%H:%M:%SZ"
+            ).timestamp()
         self._raw = host
 
     def get_full_name(self):
@@ -50,38 +55,44 @@ class VectraHost:
                 values.add(artifact["value"])
         return list(values)
 
-    def _get_artifact_types(self, artifact_set):
+    @staticmethod
+    def _get_artifact_types(artifact_set):
         artifact_keys = set()
         for artifact in artifact_set:
             artifact_keys.add(artifact["type"])
         return list(artifact_keys)
 
-    def _get_host_mac_addresses(self, artifact_set):
+    @staticmethod
+    def _get_host_mac_addresses(artifact_set):
         mac_addresses = set()
         for artifact in artifact_set:
             if artifact["type"] == "mac":
                 mac_addresses.add(artifact["value"])
         return list(mac_addresses)
 
-    def _get_vmware_vm_name(self, artifact_set):
+    @staticmethod
+    def _get_vmware_vm_name(artifact_set):
         for artifact in artifact_set:
             if artifact["type"] == "vmachine_info":
                 return artifact["value"]
         return None
 
-    def _get_vmware_vm_uuid(self, artifact_set):
+    @staticmethod
+    def _get_vmware_vm_uuid(artifact_set):
         for artifact in artifact_set:
             if artifact["type"] == "vm_uuid":
                 return artifact["value"]
         return None
 
-    def _get_aws_vm_uuid(self, artifact_set):
+    @staticmethod
+    def _get_aws_vm_uuid(artifact_set):
         for artifact in artifact_set:
             if artifact["type"] == "aws_vm_uuid":
                 return artifact["value"]
         return None
 
-    def _get_blocked_elements(self, tags):
+    @staticmethod
+    def _get_blocked_elements(tags):
         blocked_elements = {}
         for tag in tags:
             if tag.startswith("VAR ID:"):
@@ -94,7 +105,8 @@ class VectraHost:
                     blocked_elements[blocking_client].append(id)
         return blocked_elements
 
-    def _get_external_tags(self, tags):
+    @staticmethod
+    def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
             if not tag.startswith("VAR ID:") and tag not in ["VAR Host Blocked"]:
@@ -199,19 +211,22 @@ class VectraDetection:
         self.tags = self._get_external_tags(detection["tags"])
         self.blocked_elements = self._get_blocked_elements(detection["tags"])
 
-    def _get_host_id(self, detection):
+    @staticmethod
+    def _get_host_id(detection):
         try:
             return detection.get("src_host", {}).get("id")
         except AttributeError:
             return
 
-    def _get_account_id(self, detection):
+    @staticmethod
+    def _get_account_id(detection):
         try:
             return detection.get("src_account", {}).get("id")
         except AttributeError:
             return
 
-    def _get_dst_ips(self, detection):
+    @staticmethod
+    def _get_dst_ips(detection):
         dst_ips = set()
         for ip in detection["summary"].get("dst_ips", []):
             try:
@@ -221,13 +236,15 @@ class VectraDetection:
                 continue
         return list(dst_ips)
 
-    def _get_dst_domains(self, detection):
+    @staticmethod
+    def _get_dst_domains(detection):
         dst_domains = set()
         for domain in detection["summary"].get("target_domains", []):
             dst_domains.add(domain)
         return list(dst_domains)
 
-    def _get_blocked_elements(self, tags):
+    @staticmethod
+    def _get_blocked_elements(tags):
         blocked_elements = {}
         for tag in tags:
             if tag.startswith("VAR ID:"):
@@ -240,7 +257,8 @@ class VectraDetection:
                     blocked_elements[blocking_client].append(id)
         return blocked_elements
 
-    def _get_external_tags(self, tags):
+    @staticmethod
+    def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
             if not tag.startswith("VAR ID:") and tag not in ["VAR Detection Blocked"]:

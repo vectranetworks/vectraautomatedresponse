@@ -31,6 +31,12 @@ BLOCK_HOST_GROUP_NAME = "Block"
 # Threshold threat/certainty score for automatically blocking host.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 BLOCK_HOST_THREAT_CERTAINTY = (100, "and", 100)
+# V3 Only - Threshold urgency score for automatically blocking host.
+BLOCK_HOST_URGENCY = 100
+# Can't have both BLOCK_HOST_THREAT_CERTAINTY and BLOCK_HOST_URGENCY.
+# If both provided and V3 is True, BLOCK_HOST_URGENCY will be used.
+# To use BLOCK_HOST_THREAT_CERTAINTY set BLOCK_HOST_URGENCY = None
+
 # List of detection types that when present will cause host to be blocked.
 # The second argument enforces a threat/certainty threshold for hosts with those detection types on.
 BLOCK_HOST_DETECTION_TYPES = []
@@ -59,6 +65,12 @@ BLOCK_ACCOUNT_GROUP_NAME = "Block"
 # Threshold threat/certainty score for automatically blocking account.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 BLOCK_ACCOUNT_THREAT_CERTAINTY = (100, "and", 100)
+# V3 Only - Threshold urgency score for automatically blocking account.
+BLOCK_ACCOUNT_URGENCY = 100
+# Can't have both BLOCK_ACCOUNT_THREAT_CERTAINTY and BLOCK_ACCOUNT_URGENCY.
+# If both provided and V3 is True, BLOCK_ACCOUNT_URGENCY will be used.
+# To use BLOCK_ACCOUNT_THREAT_CERTAINTY set BLOCK_ACCOUNT_URGENCY = None
+
 # List of detection types that when present will cause account to be blocked.
 # The second argument enforces a threat/certainty threshold for accounts with those detection types on.
 BLOCK_ACCOUNT_DETECTION_TYPES = []
