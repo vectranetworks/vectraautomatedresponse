@@ -2,7 +2,6 @@ import argparse
 import importlib
 import ipaddress
 import logging
-import logging.handlers
 import os
 import re
 import smtplib
@@ -11,6 +10,8 @@ import sys
 import time
 import warnings
 from datetime import datetime, timedelta
+from logging.handlers import SysLogHandler
+from multiprocessing import Process
 from typing import Dict, Optional
 
 import keyring
@@ -67,7 +68,6 @@ from vectra_automated_response_consts import (
 )
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
 warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
 
 
@@ -110,8 +110,6 @@ if not Third_Party_Clients:
 HostDict = Dict[str, VectraHost]
 AccountDict = Dict[str, VectraAccount]
 DetectionDict = Dict[str, VectraDetection]
-
-# TODO decorate HTTP checks
 
 
 def log_conf(debug):
@@ -178,14 +176,15 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         Initialize Vectra client
 
         :param url: IP or hostname of Vectra brain - required
-        :param token: API token for authentication - required
+        :param token: V2 API token for authentication - required
+        :param client_id: V3 API Client ID for authentication - required
+        :param secret_key: V3 API Secret Key for authentication - required
         :param verify: verify SSL - optional
         """
-        if V3:
-            # super().__init__(url=url, token=token, client_id=client_id, secret_key=secret_key, verify=verify)
-            super().__init__(url=url, client_id=client_id, secret_key=secret_key)
+        if re.match("^http[s]?://\d{12}.uw2.portal.vectra.ai.*$", url, re.IGNORECASE):
+            super().__init__(url, client_id, secret_key)
         else:
-            super().__init__(url=url, token=token, verify=verify)
+            super().__init__(url, token, verify)
         self.logger = logging.getLogger("VectraClient")
 
     def get_account_by_uid(self, uid: str) -> list:
@@ -196,7 +195,6 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :return: list of raw account objects
         """
         params = {"uid": uid}
-        # The above code is calling a function named "get" with no arguments.
         response = requests.get(
             f"{self.url}/accounts",
             headers=self.headers,
@@ -278,7 +276,6 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 
         if condition == "and":
             r = self.get_all_hosts(
-                # t_score_gte=t_score_gte, c_score_gte=c_score_gte, all=True
                 t_score_gte=t_score_gte,
                 c_score_gte=c_score_gte,
             )
@@ -288,14 +285,12 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
                 for host in page.json().get("results", []):
                     hosts[host["id"]] = VectraHost(host)
         else:
-            # r = self.get_all_hosts(t_score_gte=t_score_gte, all=True)
             r = self.get_all_hosts(t_score_gte=t_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
                 for host in page.json().get("results", []):
                     hosts[host["id"]] = VectraHost(host)
-            # r = self.get_all_hosts(c_score_gte=c_score_gte, all=True)
             r = self.get_all_hosts(c_score_gte=c_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
@@ -327,7 +322,6 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 
         if condition == "and":
             r = self.get_all_accounts(
-                # t_score_gte=t_score_gte, c_score_gte=c_score_gte, all=True
                 t_score_gte=t_score_gte,
                 c_score_gte=c_score_gte,
             )
@@ -337,14 +331,12 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
                 for account in page.json().get("results", []):
                     accounts[account["id"]] = VectraAccount(account)
         else:
-            # r = self.get_all_hosts(t_score_gte=t_score_gte, all=True)
             r = self.get_all_accounts(t_score_gte=t_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
                     raise HTTPException(page)
                 for account in page.json().get("results", []):
                     accounts[account["id"]] = VectraAccount(account)
-            # r = self.get_all_hosts(c_score_gte=c_score_gte, all=True)
             r = self.get_all_accounts(c_score_gte=c_score_gte)
             for page in r:
                 if page.status_code not in [200, 201, 204]:
@@ -361,7 +353,6 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: HostDict
         """
         hosts = {}
-        # r = self.get_all_hosts(tags=tag, all=True)
         r = self.get_all_hosts(tags=tag)
         for page in r:
             if page.status_code not in [200, 201, 204]:
@@ -765,6 +756,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 class VectraAutomatedResponse(object):
     def __init__(
         self,
+        brain: str,
         third_party_clients: list,
         vectra_api_client: VectraClient,
         block_host_tag: Optional[str],
@@ -1249,6 +1241,7 @@ class VectraAutomatedResponse(object):
                         self.info_msg.append(message)
                         # Remove all tags set by this script from the host.
                         if "block" in tags:
+                            print(host.keys())
                             message = 'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
                                 host["name"]
                             )
@@ -1600,7 +1593,7 @@ class VectraAutomatedResponse(object):
 # Functioned used to generate notification
 def generate_messages(messages, **kwargs):
     if SEND_EMAIL:
-        logging.info("Sending email messages...")
+        logger.info("Sending email messages...")
         i = 0
         msg_type = ["Info", "Warning", "Error"]
         string = ""
@@ -1631,7 +1624,7 @@ def generate_messages(messages, **kwargs):
         smtp.quit()
 
     if SEND_SYSLOG:
-        logging.info("Sending syslog messages...")
+        logger.info("Sending syslog messages...")
         syslog = logging.getLogger("syslog")
         msg_type = ["Info", "Warning", "Error"]
         syslog_lvl = [syslog.info, syslog.warning, syslog.error]
@@ -1668,7 +1661,163 @@ def _get_password(system, key, **kwargs):
     return password
 
 
-def main():
+def main(args, vectra_api_client, third_party_clients):
+    logger = logging.getLogger("VAR")
+    log_conf(args.debug)
+    var = VectraAutomatedResponse(
+        brain=vectra_api_client.url,
+        third_party_clients=third_party_clients,
+        vectra_api_client=vectra_api_client,
+        block_host_tag=BLOCK_HOST_TAG,
+        block_account_tag=BLOCK_ACCOUNT_TAG,
+        block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
+        block_account_tc_score=BLOCK_ACCOUNT_THREAT_CERTAINTY,
+        block_host_group_name=BLOCK_HOST_GROUP_NAME,
+        block_account_group_name=BLOCK_ACCOUNT_GROUP_NAME,
+        block_host_detection_types=BLOCK_HOST_DETECTION_TYPES,
+        block_account_detection_types=BLOCK_ACCOUNT_DETECTION_TYPES,
+        block_host_detections_types_min_host_tc=BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
+        block_account_detections_types_min_account_tc=BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE,
+        no_block_host_group_name=NO_BLOCK_HOST_GROUP_NAME,
+        no_block_account_group_name=NO_BLOCK_ACCOUNT_GROUP_NAME,
+        external_block_host_tc=EXTERNAL_BLOCK_HOST_TC,
+        external_block_detection_types=EXTERNAL_BLOCK_DETECTION_TYPES,
+        external_block_detection_tag=EXTERNAL_BLOCK_DETECTION_TAG,
+        static_dest_ip_block_file=STATIC_BLOCK_DESTINATION_IPS,
+    )
+
+    if SEND_SYSLOG:
+        syslog = logging.getLogger("syslog")
+        syslog.setLevel(logging.INFO)
+        syslog.propagate = False
+        proto = {"TCP": socket.SOCK_STREAM, "UDP": socket.SOCK_DGRAM}
+        syslog_handle = SysLogHandler(
+            address=(SYSLOG_SERVER, int(SYSLOG_PORT)), socktype=proto[SYSLOG_PROTO]
+        )
+        syslog.addHandler(syslog_handle)
+
+    def take_action(alert):
+        (
+            hosts_to_block,
+            hosts_to_unblock,
+            hosts_to_groom,
+        ) = var.get_hosts_to_block_unblock(groom=args.groom)
+        if not alert:
+            var.block_hosts(hosts_to_block)
+            var.unblock_hosts(hosts_to_unblock)
+            var.groom_hosts(hosts_to_groom)
+
+        accounts_to_block, accounts_to_unblock = var.get_accounts_to_block_unblock()
+        if not alert:
+            var.block_accounts(accounts_to_block)
+            var.unblock_accounts(accounts_to_unblock)
+
+        (
+            detections_to_block,
+            detections_to_unblock,
+        ) = var.get_detections_to_block_unblock()
+        if not alert:
+            var.block_detections(detections_to_block)
+            var.unblock_detections(detections_to_unblock)
+
+        (
+            static_dst_ips_to_block,
+            static_ips_to_unblock,
+        ) = var.get_static_dst_ips_to_block_unblock()
+        if not alert:
+            var.block_static_dst_ips(static_dst_ips_to_block)
+            var.unblock_static_dst_ips(static_ips_to_unblock)
+
+        generate_messages((var.info_msg, var.warn_msg, var.err_msg))
+        if len(var.info_msg) == len(var.warn_msg) == len(var.err_msg) == 0:
+            logger.info(f"{vectra_api_client.url.split('/')[2]}: No actions taken.")
+        logger.info(f"{vectra_api_client.url.split('/')[2]}: Run finished. \n")
+
+    def create_block_days():
+        block_days = []
+        if BLOCK_DAYS == [] or "week" in BLOCK_DAYS:
+            block_days = [0, 1, 2, 3, 4, 5, 6]
+        elif "weekday" in BLOCK_DAYS:
+            block_days = [0, 1, 2, 3, 4]
+        elif "weekend" in BLOCK_DAYS:
+            block_days = [5, 6]
+        else:
+            days = {
+                "monday": 0,
+                "tuesday": 1,
+                "wednesday": 2,
+                "thursday": 3,
+                "friday": 4,
+                "saturday": 5,
+                "sunday": 6,
+            }
+            for day in BLOCK_DAYS:
+                block_days.append(days[day])
+        return block_days
+
+    def create_block_time(block_days):
+        today = datetime.today()
+        if BLOCK_START_TIME != "" and BLOCK_END_TIME != "":
+            time_diff = 24 + (int(BLOCK_END_TIME) - int(BLOCK_START_TIME))
+            start = datetime(
+                year=today.year,
+                month=today.month,
+                day=today.day,
+                hour=int(BLOCK_START_TIME),
+            )
+            end = start + timedelta(hours=time_diff)
+        elif BLOCK_START_TIME == "" or BLOCK_END_TIME == "":
+            logger.info(
+                "Either a start or end time was not provided. Handling as full time."
+            )
+            start = datetime(
+                year=today.year, month=today.month, day=today.day, hour=0, minute=0
+            )
+            end = datetime(
+                year=today.year, month=today.month, day=today.day, hour=23, minute=59
+            )
+        return start, end
+
+    if args.loop:
+        init = True
+        block_days = create_block_days()
+        start, end = create_block_time(block_days)
+
+        test = datetime.now()
+
+        while True:
+            if test.weekday() in block_days:
+                if init and (test - timedelta(hours=24)).weekday() in block_days:
+                    if (
+                        (start - timedelta(hours=24))
+                        <= datetime.now()
+                        <= (end - timedelta(hours=24))
+                    ):
+                        test -= timedelta(hours=24)
+                        start -= timedelta(hours=24)
+                        end -= timedelta(hours=24)
+
+                while start <= datetime.now() <= end:
+                    take_action(args.alert)
+                    time.sleep(60 * SLEEP_MINUTES)
+
+                init = False
+
+                if test.weekday() != datetime.now().weekday():
+                    test = datetime.now()
+                    start += timedelta(hours=24)
+                    end += timedelta(hours=24)
+                logger.info("Not within automated response window.")
+            else:
+                take_action(args.alert)
+
+            time.sleep(60 * SLEEP_MINUTES)
+    else:
+        take_action(args.alert)
+
+
+if __name__ == "__main__":
+
     def obtain_args():
         parser = argparse.ArgumentParser(
             description="Vectra Automated Response Framework ",
@@ -1720,6 +1869,7 @@ def main():
 
     args = obtain_args()
 
+    logger = logging.getLogger("VAR")
     log_conf(args.debug)
     if args.no_store_secrets:
         store = False
@@ -1727,175 +1877,38 @@ def main():
         store = True
 
     modify = (store, args.update_secrets)
-    if V3:
-        vectra_api_client = VectraClient(
-            url=COGNITO_URL,
-            client_id=_get_password("Vectra_Platform", "Client_ID", modify=modify),
-            secret_key=_get_password("Vectra_Platform", "Secret_Key", modify=modify),
-        )
-    else:
-        vectra_api_client = VectraClient(
-            url=COGNITO_URL,
-            token=_get_password("Vectra_Detect", "Token", modify=modify),
-        )
+    vectra_api_clients = []
+    for url in COGNITO_URL:
+        logger.debug(f"Configuring Vectra API Client for {url}")
+        if re.match("^http[s]?://\d{12}.uw2.portal.vectra.ai.*$", url, re.IGNORECASE):
+            vectra_api_clients.append(
+                VectraClient(
+                    url=url,
+                    client_id=_get_password(url, "Client_ID", modify=modify),
+                    secret_key=_get_password(url, "Secret_Key", modify=modify),
+                )
+            )
+        else:
+            vectra_api_clients.append(
+                VectraClient(
+                    url,
+                    _get_password(url, "Token", modify=modify),
+                )
+            )
 
+    logger.debug("Configuring Third Party Clients")
     third_party_clients = [
         Third_Party_Client.Client(modify=modify)
         for Third_Party_Client in Third_Party_Clients
     ]
 
-    var = VectraAutomatedResponse(
-        third_party_clients=third_party_clients,
-        vectra_api_client=vectra_api_client,
-        block_host_tag=BLOCK_HOST_TAG,
-        block_account_tag=BLOCK_ACCOUNT_TAG,
-        block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
-        block_account_tc_score=BLOCK_ACCOUNT_THREAT_CERTAINTY,
-        block_host_group_name=BLOCK_HOST_GROUP_NAME,
-        block_account_group_name=BLOCK_ACCOUNT_GROUP_NAME,
-        block_host_detection_types=BLOCK_HOST_DETECTION_TYPES,
-        block_account_detection_types=BLOCK_ACCOUNT_DETECTION_TYPES,
-        block_host_detections_types_min_host_tc=BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
-        block_account_detections_types_min_account_tc=BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE,
-        no_block_host_group_name=NO_BLOCK_HOST_GROUP_NAME,
-        no_block_account_group_name=NO_BLOCK_ACCOUNT_GROUP_NAME,
-        external_block_host_tc=EXTERNAL_BLOCK_HOST_TC,
-        external_block_detection_types=EXTERNAL_BLOCK_DETECTION_TYPES,
-        external_block_detection_tag=EXTERNAL_BLOCK_DETECTION_TAG,
-        static_dest_ip_block_file=STATIC_BLOCK_DESTINATION_IPS,
-    )
-
-    if SEND_SYSLOG:
-        syslog = logging.getLogger("syslog")
-        syslog.setLevel(logging.INFO)
-        syslog.propagate = False
-        proto = {"TCP": socket.SOCK_STREAM, "UDP": socket.SOCK_DGRAM}
-        syslog_handle = logging.handlers.SysLogHandler(
-            address=(SYSLOG_SERVER, int(SYSLOG_PORT)), socktype=proto[SYSLOG_PROTO]
+    processors = []
+    logger.debug("Creating individual process for each Vectra API Client")
+    for vectra_api_client in vectra_api_clients:
+        processors.append(
+            Process(target=main, args=(args, vectra_api_client, third_party_clients))
         )
-        syslog.addHandler(syslog_handle)
-
-    def take_action(alert):
-        (
-            hosts_to_block,
-            hosts_to_unblock,
-            hosts_to_groom,
-        ) = var.get_hosts_to_block_unblock(groom=args.groom)
-        if not alert:
-            var.block_hosts(hosts_to_block)
-            var.unblock_hosts(hosts_to_unblock)
-            var.groom_hosts(hosts_to_groom)
-
-        accounts_to_block, accounts_to_unblock = var.get_accounts_to_block_unblock()
-        if not alert:
-            var.block_accounts(accounts_to_block)
-            var.unblock_accounts(accounts_to_unblock)
-
-        (
-            detections_to_block,
-            detections_to_unblock,
-        ) = var.get_detections_to_block_unblock()
-        if not alert:
-            var.block_detections(detections_to_block)
-            var.unblock_detections(detections_to_unblock)
-
-        (
-            static_dst_ips_to_block,
-            static_ips_to_unblock,
-        ) = var.get_static_dst_ips_to_block_unblock()
-        if not alert:
-            var.block_static_dst_ips(static_dst_ips_to_block)
-            var.unblock_static_dst_ips(static_ips_to_unblock)
-
-        generate_messages((var.info_msg, var.warn_msg, var.err_msg))
-        if len(var.info_msg) == len(var.warn_msg) == len(var.err_msg) == 0:
-            logging.info("No actions taken.")
-        logging.info("Run finished. \n\n\n")
-
-    def create_block_days():
-        block_days = []
-        if BLOCK_DAYS == [] or "week" in BLOCK_DAYS:
-            block_days = [0, 1, 2, 3, 4, 5, 6]
-        elif "weekday" in BLOCK_DAYS:
-            block_days = [0, 1, 2, 3, 4]
-        elif "weekend" in BLOCK_DAYS:
-            block_days = [5, 6]
-        else:
-            days = {
-                "monday": 0,
-                "tuesday": 1,
-                "wednesday": 2,
-                "thursday": 3,
-                "friday": 4,
-                "saturday": 5,
-                "sunday": 6,
-            }
-            for day in BLOCK_DAYS:
-                block_days.append(days[day])
-        return block_days
-
-    def create_block_time(block_days):
-        today = datetime.today()
-        if BLOCK_START_TIME != "" and BLOCK_END_TIME != "":
-            time_diff = 24 + (int(BLOCK_END_TIME) - int(BLOCK_START_TIME))
-            start = datetime(
-                year=today.year,
-                month=today.month,
-                day=today.day,
-                hour=int(BLOCK_START_TIME),
-            )
-            end = start + timedelta(hours=time_diff)
-        elif BLOCK_START_TIME == "" or BLOCK_END_TIME == "":
-            logging.info(
-                "Either a start or end time was not provided. Handling as full time."
-            )
-            start = datetime(
-                year=today.year, month=today.month, day=today.day, hour=0, minute=0
-            )
-            end = datetime(
-                year=today.year, month=today.month, day=today.day, hour=23, minute=59
-            )
-        return start, end
-
-    if args.loop:
-        init = True
-        block_days = create_block_days()
-        start, end = create_block_time(block_days)
-
-        test = datetime.now()
-
-        while True:
-            if test.weekday() in block_days:
-                if init and (test - timedelta(hours=24)).weekday() in block_days:
-                    if (
-                        (start - timedelta(hours=24))
-                        <= datetime.now()
-                        <= (end - timedelta(hours=24))
-                    ):
-                        test -= timedelta(hours=24)
-                        start -= timedelta(hours=24)
-                        end -= timedelta(hours=24)
-
-                while start <= datetime.now() <= end:
-                    take_action(args.alert)
-                    time.sleep(60 * SLEEP_MINUTES)
-
-                # take_action(args.alert)
-                # time.sleep(60 * SLEEP_MINUTES)
-                init = False
-
-                if test.weekday() != datetime.now().weekday():
-                    test = datetime.now()
-                    start += timedelta(hours=24)
-                    end += timedelta(hours=24)
-                logging.info("Not within automated response window.")
-            else:
-                take_action(args.alert)
-
-            time.sleep(60 * SLEEP_MINUTES)
-    else:
-        take_action(args.alert)
-
-
-if __name__ == "__main__":
-    main()
+    for p in processors:
+        p.start()
+    for p in processors:
+        p.join()

@@ -44,9 +44,21 @@ try:
             ).unsafe_ask()
             if clients != []:
                 confs[conf] = clients
-            else:
-                clients = ast.literal_eval(confs[conf])
-
+            # else:
+            #     clients = ast.literal_eval(confs[conf])
+        elif conf == "COGNITO_URL":
+            more = True
+            urls = []
+            while more:
+                arg = questionary.text(
+                    f"Configure {conf} (current: {confs[conf]}): "
+                ).unsafe_ask()
+                if arg != "":
+                    urls.append(arg)
+                    confs[conf] = urls
+                more = questionary.confirm(
+                    "Do you have additional Brains? ", default=False
+                ).ask()
         else:
             if conf in ["LOG_FILE"] and confs["LOG_TO_FILE"] == "False":
                 continue
@@ -64,6 +76,7 @@ try:
                 and confs["SEND_SYSLOG"] == "False"
             ):
                 continue
+
             arg = questionary.text(
                 f"Configure {conf} (current: {confs[conf]}): "
             ).unsafe_ask()

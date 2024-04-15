@@ -95,6 +95,7 @@ class Client(ThirdPartyInterface):
                 if account.ldap.get("sam_account_name")
                 else account.fake_sam
             )
+            cmd.append(account.context)
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return account.blocked_elements.get(self.__class__.__name__)
