@@ -1,9 +1,7 @@
 import json
 import re
-import sys
 import time
 import warnings
-from pathlib import Path
 
 import requests
 
@@ -14,7 +12,7 @@ class HTTPException(Exception):
     def __init__(self, response):
         """
         Custom exception class to report possible API errors
-        The body is contructed by extracting the API error code from the requests.Response object
+        The body is constructed by extracting the API error code from the requests.Response object
         """
         try:
             r = response.json()
@@ -33,11 +31,11 @@ class HTTPException(Exception):
 
 
 class HTTPUnauthorizedException(HTTPException):
-    '''Specific Exception'''
+    """Specific Exception"""
 
 
 class HTTPTooManyRequestsException(HTTPException):
-    '''Specific Exception'''
+    """Specific Exception"""
 
 
 def request_error_handler(func):
@@ -60,7 +58,7 @@ def deprecation(message):
 
 
 def param_deprecation(key):
-    message = f"{key} will be deprecated with Vectra API which will be annouced in an upcoming release"
+    message = f"{key} will be deprecated with Vectra API which will be announced in an upcoming release"
     warnings.warn(message, PendingDeprecationWarning)
 
 
@@ -69,8 +67,8 @@ class VectraSaaSClient(object):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param client_id: API Client ID for authentication - requried
-        :param secret_key: API Secret Key for authenticaiton - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
         :param verify: Verify SSL (default: False) - optional
         """
         url = VectraSaaSClient._remove_trailing_slashes(url)
@@ -169,36 +167,42 @@ class VectraSaaSClient(object):
         """
         params = {}
         valid_keys = [
-                        "c_score",
-                        "c_score_gte",
-                        "category",
-                        "certainty",
-                        "certainty_gte",
-                        "destination",
-                        "detection_category",
-                        "detection_type",
-                        "fields",
-                        "host_id",
-                        "id",
-                        "is_targeting_key_asset",
-                        "last_timestamp",
-                        "max_id",
-                        "min_id",
-                        "note_modified_timestamp_gte",
-                        "ordering",
-                        "page",
-                        "page_size",
-                        "proto",
-                        "src_account",
-                        "src_ip",
-                        "state",
-                        "t_score",
-                        "t_score_gte",
-                        "tags",
-                        "threat_gte",
-                        "threat_score"
-                    ]
-        deprecated_keys = ["c_score", "c_score_gte", "category", "t_score", "t_score_gte"]
+            "c_score",
+            "c_score_gte",
+            "category",
+            "certainty",
+            "certainty_gte",
+            "destination",
+            "detection_category",
+            "detection_type",
+            "fields",
+            "host_id",
+            "id",
+            "is_targeting_key_asset",
+            "last_timestamp",
+            "max_id",
+            "min_id",
+            "note_modified_timestamp_gte",
+            "ordering",
+            "page",
+            "page_size",
+            "proto",
+            "src_account",
+            "src_ip",
+            "state",
+            "t_score",
+            "t_score_gte",
+            "tags",
+            "threat_gte",
+            "threat_score",
+        ]
+        deprecated_keys = [
+            "c_score",
+            "c_score_gte",
+            "category",
+            "t_score",
+            "t_score_gte",
+        ]
         for k, v in args.items():
             if k in valid_keys:
                 if v is not None:
@@ -232,7 +236,7 @@ class VectraSaaSClient(object):
             "ordering",
             "page",
             "page_size",
-            "priviledge_category",
+            "privilege_category",
             "privilege_level",
             "privilege_level_gte",
             "state",
@@ -441,7 +445,7 @@ class VectraSaaSClient(object):
         :param min_id: minimum ID of detection returned
         :param ordering: field used to sort response
         :param page: page number to return (int)
-        :param page_size: number of object to return in repsonse (int)
+        :param page_size: number of object to return in response (int)
         :param src_ip: source ip address of host attributed to detection
         :param state: state of detection (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
@@ -532,13 +536,13 @@ class VectraSaaSClient(object):
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         :param ordering: field to use to order response
         :param page: page number to return (int)
-        :param page_size: number of object to return in repsonse (int)
+        :param page_size: number of object to return in response (int)
         :param privilege_category: privilege category of account (low/medium/high)
         :param privilege_level: privilege level of account (0-10)
         :param privilege_level_gte: privilege of account level greater than or equal to (int)
         :param state: state of host (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
-        :param t_score_gte: threat score greater than or equal to (int) - will be removed with deprection of v1 of api
+        :param t_score_gte: threat score greater than or equal to (int) - will be removed with deprecation of v1 of api
         :param tags: tags assigned to account
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
@@ -586,7 +590,7 @@ class VectraSaaSClient(object):
         :param include_templates: include rule templates, default is False
         :param ordering: field used to sort response
         :param page: page number to return (int)
-        :param page_size: number of object to return in repsonse (int)
+        :param page_size: number of object to return in response (int)
         """
         resp = self._request(
             method="get",
@@ -613,7 +617,6 @@ class VectraSaaSClient(object):
         """
         if not rule_id:
             raise ValueError("Rule id required")
-
 
         return self._request(
             method="get",
@@ -836,7 +839,7 @@ class VectraSaaSClient(object):
     def get_detection_tags(self, detection_id=None):
         """
         Get detection tags
-        :param detection_id: detction ID. required
+        :param detection_id: detection ID. required
         """
         if not detection_id:
             raise ValueError("Must provide detection_id.")
@@ -869,34 +872,6 @@ class VectraSaaSClient(object):
             url=f"{self.url}/tagging/detection/{detection_id}",
             json=payload,
         )
-
-    # def bulk_set_detections_tag(self, tag, detection_ids):
-    #     """
-    #     Set a tag in bulk on multiple detections. Only one tag can be set at a time
-    #     :param detection_ids: IDs of the detections for which to set the tag
-    #     """
-    #     if not isinstance(detection_ids, list):
-    #         raise TypeError('Detection IDs must be of type list')
-
-    #     payload = {
-    #         'objectIds': detection_ids,
-    #         'tag': tag
-    #     }
-    #     return self._request(method='post', url=f'{self.url}/tagging/detection', json=payload)
-
-    # def bulk_delete_detections_tag(self, tag, detection_ids):
-    #     """
-    #     Delete a tag in bulk on multiple detections. Only one tag can be deleted at a time
-    #     :param detection_ids: IDs of the detections for which to delete the tag
-    #     """
-    #     if not isinstance(detection_ids, list):
-    #         raise TypeError('Detection IDs must be of type list')
-
-    #     payload = {
-    #         'objectIds': detection_ids,
-    #         'tag': tag
-    #     }
-    #     return self._request(method='delete', url=f'{self.url}/tagging/detection', json=payload)
 
     def get_detection_notes(self, detection_id=None):
         """
@@ -1040,37 +1015,6 @@ class VectraSaaSClient(object):
         return self._request(
             method="patch", url=f"{self.url}/tagging/account/{account_id}", json=payload
         )
-
-    # def bulk_set_accounts_tag(self, tag, account_ids):
-    #     """
-    #     Set a tag in bulk on multiple accounts. Only one tag can be set at a time
-    #     Note that account IDs in APIv2.1 are not the same IDs as seen in the UI
-    #     :param account_ids: IDs of the accounts for which to set the tag
-    #     """
-    #     if not isinstance(account_ids, list):
-    #         raise TypeError('account IDs must be of type list')
-
-    #     payload = {
-    #         'objectIds': account_ids,
-    #         'tag': tag
-    #     }
-    #     return self._request(method='post', url=f'{self.url}/tagging/account', json=payload)
-
-    # @request_error_handler
-    # def bulk_delete_accounts_tag(self, tag, account_ids):
-    #     """
-    #     Delete a tag in bulk on multiple accounts. Only one tag can be deleted at a time
-    #     Note that account IDs in APIv2.1 are not the same IDs as seen in the UI
-    #     :param account_ids: IDs of the accounts on which to delete the tag
-    #     """
-    #     if not isinstance(account_ids, list):
-    #         raise TypeError('account IDs must be of type list')
-
-    #     payload = {
-    #         'objectIds': account_ids,
-    #         'tag': tag
-    #     }
-    #     return self._request(method='delete', url=f'{self.url}/tagging/account',  json=payload)
 
     def get_account_notes(self, account_id=None):
         """
@@ -1216,7 +1160,7 @@ class VectraSaaSClient(object):
     def update_assignment(self, assignment_id=None, assign_to_user_id=None):
         """
         Update an existing assignment
-        :param assignment_id: ID of the assigbment to update
+        :param assignment_id: ID of the assignment to update
         :param assign_to_user_id: ID of the assignee
         """
         if not assignment_id:
@@ -1398,8 +1342,8 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param client_id: API Client ID for authentication - requried
-        :param secret_key: API Secret Key for authenticaiton - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
@@ -1429,8 +1373,9 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
             "page_size",
             "state",
             "tags",
+            "type",
         ]
-        deprecated_keys = []
+        deprecated_keys = ["entity_type"]
         for k, v in args.items():
             if k in valid_keys:
                 if v is not None:
@@ -1495,7 +1440,6 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         while resp.json()["next"]:
             resp = self._request(method="get", url=resp.json()["next"])
             yield resp
-        url = f"{self.url}/entities"
 
     def get_entity_by_id(self, entity_id=None, **kwargs):
         """
@@ -1539,8 +1483,8 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param client_id: API Client ID for authentication - requried
-        :param secret_key: API Secret Key for authenticaiton - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
@@ -1632,7 +1576,13 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         return response.json()["results"]
 
     def create_group(
-        self, name=None, description="", type='', members=[], importance='Medium', **kwargs
+        self,
+        name=None,
+        description="",
+        type="",
+        members=[],
+        importance="Medium",
+        **kwargs,
     ):
         """
         Create group
@@ -1644,9 +1594,9 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         :param rules: list of triage rule ids to add to group
         :rtype requests.Response:
         """
-        #TODO: validate type
-        #TODO: convert importance from string to int
-        #TODO: validate k,v
+        # TODO: validate type
+        # TODO: convert importance from string to int
+        # TODO: validate k,v
         if not name:
             raise ValueError("missing required parameter: name")
         if not isinstance(members, list):
@@ -1692,15 +1642,15 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            if group['type'] in ['domain','ip']:
-                for member in group['members']:
+            if group["type"] in ["domain", "ip"]:
+                for member in group["members"]:
                     members.append(member)
-            elif group['type'] == 'account':
-                for member in group['members']:
-                    members.append(member['uid'])
+            elif group["type"] == "account":
+                for member in group["members"]:
+                    members.append(member["uid"])
             else:
-                for member in group['members']:
-                    members.append(member['id'])
+                for member in group["members"]:
+                    members.append(member["id"])
         # Ensure members are unique
         members = list(set(members))
 
@@ -1728,8 +1678,8 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param client_id: API Client ID for authentication - requried
-        :param secret_key: API Secret Key for authenticaiton - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
@@ -2035,7 +1985,7 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param min_id: minimum ID of hosts returned
         :param ordering: field used to sort response
         :param page: page number to return (int)
-        :param page_size: number of object to return in repsonse (int)
+        :param page_size: number of object to return in response (int)
         :param state: state of hosts (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
         :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
@@ -2054,25 +2004,25 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
             resp = self._request(method="get", url=resp.json()["next"])
             yield resp
 
-    def get_hosts_by_id(self, hosts_id=None, **kwargs):
+    def get_host_by_id(self, host_id=None, **kwargs):
         """
         Get hosts by id
-        :param hosts_id: hosts id - required
+        :param host_id: hosts id - required
         """
-        if not hosts_id:
+        if not host_id:
             raise ValueError("hosts id required")
 
         return self._request(
             method="get",
-            url=f"{self.url}/hosts/{hosts_id}",
+            url=f"{self.url}/hosts/{host_id}",
             params=self._generate_host_params(kwargs),
         )
 
     def get_entity_tags(self, entity_id=None, entity_type=None, type=None):
         """
         Get entity tags
-        :param entity_id: detction ID. required
-        :param entity_type: depracated for type
+        :param entity_id: detection ID. required
+        :param entity_type: deprecated for type
         :param type: "account","host","account,host"
         """
         if not entity_id:
@@ -2120,27 +2070,27 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
             params=params,
         )
 
-    def get_hosts_tags(self, hosts_id=None):
+    def get_host_tags(self, host_id=None):
         """
         Get hosts tags
-        :param hosts_id: detction ID. required
+        :param host_id: detection ID. required
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
-        return self._request(method="get", url=f"{self.url}/tagging/host/{hosts_id}")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
+        return self._request(method="get", url=f"{self.url}/tagging/host/{host_id}")
 
-    def set_hosts_tags(self, hosts_id=None, tags=[], append=False):
+    def set_host_tags(self, host_id=None, tags=[], append=False):
         """
         Set  hosts tags
-        :param hosts_id: - required
+        :param host_id: - required
         :param tags: list of tags to add to hosts
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear all tags (default: False)
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
         if append and isinstance(tags, list):
-            current_list = self.get_hosts_tags(hosts_id=hosts_id).json()["tags"]
+            current_list = self.get_host_tags(host_id=host_id).json()["tags"]
             payload = {"tags": current_list + tags}
         elif isinstance(tags, list):
             payload = {"tags": tags}
@@ -2148,54 +2098,54 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
             raise TypeError("tags must be of type list")
 
         return self._request(
-            method="patch", url=f"{self.url}/tagging/host/{hosts_id}", json=payload
+            method="patch", url=f"{self.url}/tagging/host/{host_id}", json=payload
         )
 
-    def get_hosts_notes(self, hosts_id=None):
+    def get_host_notes(self, host_id=None):
         """
         Get hosts notes
-        :param hosts_id:
+        :param host_id:
         For consistency we return a requests.models.Response object
         As we do not want to return the complete hosts body, we alter the response content
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
-        hosts = self._request(method="get", url=f"{self.url}/hosts/{hosts_id}/notes")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
+        hosts = self._request(method="get", url=f"{self.url}/hosts/{host_id}/notes")
         if hosts.status_code == 200:
             json_dict = {
                 "status": "success",
-                "hosts_id": str(hosts_id),
+                "host_id": str(host_id),
                 "notes": hosts.json()["notes"],
             }
             hosts._content = json.dumps(json_dict).encode("utf-8")
         return hosts
 
-    def get_hosts_note_by_id(self, hosts_id=None, note_id=None):
+    def get_host_note_by_id(self, host_id=None, note_id=None):
         """
         Get hosts notes
-        :param hosts_id:
+        :param host_id:
         :param note_id:
         For consistency we return a requests.models.Response object
         As we do not want to return the complete hosts body, we alter the response content
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
         if not note_id:
             raise ValueError("Must provide note_id.")
 
         hosts = self._request(
-            method="get", url=f"{self.url}/hosts/{hosts_id}/notes/{note_id}"
+            method="get", url=f"{self.url}/hosts/{host_id}/notes/{note_id}"
         )
         return hosts
 
-    def set_hosts_note(self, hosts_id=None, note=""):
+    def set_host_note(self, host_id=None, note=""):
         """
         Set hosts note
-        :param hosts_id: - required
+        :param host_id: - required
         :param note: content of the note to set - required
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
 
         if isinstance(note, str) and note != "":
             payload = {"note": note}
@@ -2203,24 +2153,24 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
             raise TypeError("Note must be of type str and cannot be empty.")
 
         return self._request(
-            method="post", url=f"{self.url}/hosts/{hosts_id}/notes", json=payload
+            method="post", url=f"{self.url}/hosts/{host_id}/notes", json=payload
         )
 
-    def update_hosts_note(self, hosts_id=None, note_id=None, note="", append=False):
+    def update_host_note(self, host_id=None, note_id=None, note="", append=False):
         """
         Set hosts note
-        :param hosts_id: - required
+        :param host_id: - required
         :param note: content of the note to set - required
         :param append: overwrites existing note if set to False, appends if set to True
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
         if not note_id:
             raise ValueError("Must provide note_id.")
 
         if append and isinstance(note, str):
-            current_note = self.get_hosts_note_by_id(
-                hosts_id=hosts_id, note_id=note_id
+            current_note = self.get_host_note_by_id(
+                host_id=host_id, note_id=note_id
             ).json()["note"]
             if current_note:
                 if len(note) > 0:
@@ -2236,23 +2186,23 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
 
         return self._request(
             method="patch",
-            url=f"{self.url}/hosts/{hosts_id}/notes/{note_id}",
+            url=f"{self.url}/hosts/{host_id}/notes/{note_id}",
             json=payload,
         )
 
-    def delete_hosts_note(self, hosts_id=None, note_id=None):
+    def delete_host_note(self, host_id=None, note_id=None):
         """
         Set hosts note
-        :param hosts_id: - required
+        :param host_id: - required
         :param note_id - required
         """
-        if not hosts_id:
-            raise ValueError("Must provide hosts_id.")
+        if not host_id:
+            raise ValueError("Must provide host_id.")
         if not note_id:
             raise ValueError("Must provide note_id.")
 
         return self._request(
-            method="delete", url=f"{self.url}/hosts/{hosts_id}/notes/{note_id}"
+            method="delete", url=f"{self.url}/hosts/{host_id}/notes/{note_id}"
         )
 
     def get_entity_notes(self, entity_id=None, entity_type=None, type=None):
@@ -2489,54 +2439,3 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         if last_login_gte:
             params["last_login_gte"] = last_login_gte
         return self._request(method="get", url=f"{self.url}/users", params=params)
-
-
-def parse_args(args):
-    """Parse CLI arguments"""
-    parser.add_argument(
-        "--cognito_url",
-        type=str,
-        help="URL of brain to process. If omitted it will be asked for",
-    )
-    parser.add_argument(
-        "--client_id",
-        type=str,
-        help="Client ID for the SaaS API. If omitted it will be asted for.",
-    )
-    parser.add_argument(
-        "--secret_key",
-        type=str,
-        help="Secret Key for the SaaS API. If omitted it will be asted for.",
-    )
-
-    return parser.parse_args(args)
-
-
-if __name__ == "__main__":
-    parser = parse_args(sys.argv[1:])
-
-    def write_tokens(client):
-        with open(".tokens", "w") as f:
-            f.write(f"_access:{client._access}\n")
-            f.write(f"_accessTime:{client._accessTime}\n")
-            f.write(f"_refresh:{client._refresh}\n")
-            f.write(f"_refreshTime:{client._refreshTime}")
-
-    def open_tokens(client):
-        with open(".tokens", "r") as f:
-            tokens = f.read()
-        token = dict(x.split(":") for x in tokens.splitlines())
-        client._access = token["_access"]
-        client._accessTime = int(token["_accessTime"])
-        client._refresh = token["_refresh"]
-        client._refreshTime = int(token["_refreshTime"])
-
-    saasClient = VectraSaaSClient(
-        url=parser.cognito_url, client_id=parser.client_id, secret_key=parser.secret_key
-    )
-
-    if Path(".tokens").is_file():
-        open_tokens(saasClient)
-    else:
-        saasClient._get_token()
-        write_tokens(saasClient)
