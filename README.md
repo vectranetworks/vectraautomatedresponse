@@ -89,9 +89,12 @@ The goal of host-based blocking is identifying internal hosts who need to be pre
 There are multiple parameters within the [config.py](./config.py) file which define how hosts are being selected for blocking:
 
 1. BLOCK_HOST_TAG: defines a tag that when set on a host will cause that host to be blocked.
-2. BLOCK_HOST_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Cognito UI, it will not be created by the script. 
-3. BLOCK_HOST_THREAT_CERTAINTY: defines a threat and certainty score threshold, above which host will get blocked. The middle variable can be either _and_ or _or_, defining how the threat and certainty conditions are threated. 
-4. BLOCK_HOST_DETECTION_TYPES: this is a list containing specific detection types, which when present on a host will cause that host to be blocked. Using the _BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE_ variable, it is possible to define a minimum threat/certainty score for those detections to cause blocking of the host. 
+2. NO_BLOCK_HOST_GROUP_NAME: defines a group name, where all members of that group will not be blocked. That group needs to be created manually on the Detect UI, it will not be created by the script.
+3. BLOCK_HOST_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Cognito UI, it will not be created by the script. 
+4. BLOCK_HOST_THREAT_CERTAINTY: defines a threat and certainty score threshold, above which host will get blocked. The middle variable can be either _and_ or _or_, defining how the threat and certainty conditions are threated.
+5. BLOCK_HOST_URGENCY: defines an urgency score threshold, above which host will get blocked. Only used with V3 API Can't have both BLOCK_HOST_THREAT_CERTAINTY and BLOCK_HOST_URGENCY. If both provided and V3 is True, BLOCK_HOST_URGENCY will be used. To use BLOCK_HOST_THREAT_CERTAINTY set BLOCK_HOST_URGENCY = None
+6. BLOCK_HOST_DETECTION_TYPES: this is a list containing specific detection types, which when present on a host will cause that host to be blocked. 
+7. BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE: minimum Threat and/or Certainty scores for an HOST with specified detection types before it will be blocked. 
 
 Besides this, the _NO_BLOCK_HOST_GROUP_NAME_ Defines a group name from which all members will never be blocked. Users need to create that group themselves, it is not created automatically by the script. 
 
@@ -103,11 +106,12 @@ The goal of account-based blocking is to disable or otherwise restrict an accoun
 Currently, the only module supporting this functionality is by calling an external program with the `external_call` module.
 
 1. BLOCK_ACCOUNT_TAG: defines the tag applied to an account which results in the block_account methods being called for the configured clients
-2. NO_BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will not be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
+2. NO_BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will not be blocked. That group needs to be created manually on the Detect UI, it will not be created by the script.
 3. BLOCK_ACCOUNT_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Detect UI, it will not be created by the script.
 4. BLOCK_ACCOUNT_THREAT_CERTAINTY: defines a threat and certainty score threshold, above which host will get blocked. The middle variable can be either _and_ or _or_, defining how the threat and certainty conditions are treated.
-5. BLOCK_ACCOUNT_DETECTION_TYPES: this is a list containing specific detection types, which will always result in the account being blocked. 
-6. BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE: minimum Threat and/or Certainty scores for an account with specified detection types before it will be blocked.
+5. BLOCK_ACCOUNT_URGENCY: defines an urgency score threshold, above which host will get blocked. Only used with V3 API Can't have both BLOCK_ACCOUNT_THREAT_CERTAINTY and BLOCK_ACCOUNT_URGENCY. If both provided and V3 is True, BLOCK_ACCOUNT_URGENCY will be used. To use BLOCK_ACCOUNT_THREAT_CERTAINTY set BLOCK_ACCOUNT_URGENCY = None
+6. BLOCK_ACCOUNT_DETECTION_TYPES: this is a list containing specific detection types, which will always result in the account being blocked. 
+7. BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE: minimum Threat and/or Certainty scores for an account with specified detection types before it will be blocked.
 
 ## Detection-based blocking
 
@@ -170,6 +174,10 @@ ACCOUNT_UNBLOCK_CMD = []
 DETECTION_BLOCK_CMD = []
 DETECTION_UNBLOCK_CMD = []
 ```
+# We need first to put the endpoint in a temporary policy to make the port bounce
+QUARANTAINE_POLICY = "block"
+```
+
 
 To configure commands, each element of the command must become an element in the appropriate list.  As an example, if the desired command to execute is to ping source IP 5 times, the list would be configured as such:  
 ```python
@@ -185,6 +193,7 @@ The default code in the `external_call.py` module is written to supply the comma
             cmd.append(host.ip)
             r = subprocess.run(cmd)
 ```
+
 The IP or account name may need to be inserted into command list vs appending, this requires modification to the default code. 
 
 ## Static Destination IP Blocking
