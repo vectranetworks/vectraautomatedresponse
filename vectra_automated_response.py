@@ -18,7 +18,6 @@ import keyring
 import questionary
 import requests
 import saas
-import vat.vectra as vectra
 from config import (
     BLOCK_ACCOUNT_DETECTION_TYPES,
     BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE,
@@ -69,10 +68,12 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
+import vat.vectra as vectra
+
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
 
-
+URL_REGEX = r"^http[s]?://\d{12}.(uw2|ew1|cc1|as2).portal.vectra.ai.*$"
 clients = {}
 for client in os.listdir("third_party_clients"):
     if client not in [
@@ -183,7 +184,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :param secret_key: V3 API Secret Key for authentication - required
         :param verify: verify SSL - optional
         """
-        if re.match("^http[s]?://\d{12}.uw2.portal.vectra.ai.*$", url, re.IGNORECASE):
+        if re.match(URL_REGEX, url, re.IGNORECASE):
             super().__init__(url, client_id, secret_key, verify)
         else:
             super().__init__(url, token, verify)
@@ -658,13 +659,13 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         if len(detection_types) < 1:
             return detections
         else:
-            r = self.get_all_detections(detection_type=detection_types, state="active")
-            self.logger.debug("get_all_detections:{}".format(r.content))
-            for page in r:
-                if page.status_code not in [200, 201, 204]:
-                    raise HTTPException(page)
-                for detection in page.json().get("results", []):
-                    detections[detection["id"]] = VectraDetection(detection)
+            for detection_type in detection_types:
+                r = self.get_all_detections(detection_type=detection_type, state="active")
+                for page in r:
+                    if page.status_code not in [200, 201, 204]:
+                        raise HTTPException(page)
+                    for detection in page.json().get("results", []):
+                        detections[detection["id"]] = VectraDetection(detection)
         return detections
 
     def get_detections_on_host(self, host_id: int) -> DetectionDict:
@@ -1967,7 +1968,7 @@ if __name__ == "__main__":
     vectra_api_clients = []
     for url in COGNITO_URL:
         logger.debug(f"Configuring Vectra API Client for {url}")
-        if re.match("^http[s]?://\d{12}.uw2.portal.vectra.ai.*$", url, re.IGNORECASE):
+        if re.match(URL_REGEX, url, re.IGNORECASE):
             vectra_api_clients.append(
                 VectraClient(
                     url=url,
