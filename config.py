@@ -40,7 +40,7 @@ BLOCK_HOST_URGENCY = 100
 # List of detection types that when present will cause host to be blocked.
 # The second argument enforces a threat/certainty threshold for hosts with those detection types on.
 BLOCK_HOST_DETECTION_TYPES = []
-BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, "or", 100)
+BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, "and", 100)
 
 ### EXTERNAL IP BlOCKING
 # Host threat/certainty score when reached will get all detections on the host.
@@ -74,7 +74,7 @@ BLOCK_ACCOUNT_URGENCY = 100
 # List of detection types that when present will cause account to be blocked.
 # The second argument enforces a threat/certainty threshold for accounts with those detection types on.
 BLOCK_ACCOUNT_DETECTION_TYPES = []
-BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE = (100, "or", 100)
+BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE = (100, "and", 100)
 
 ### Notification Setup
 # SMTP Configuration
