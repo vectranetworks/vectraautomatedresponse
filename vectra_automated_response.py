@@ -73,6 +73,16 @@ import vat.vectra as vectra
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
 
+
+def namestr(obj, namespace):
+    return [name for name in namespace if namespace[name] is obj]
+
+
+class TypeException(TypeError):
+    def __init__(self, imported_list, val):
+        logger.error(f"{imported_list} is not of {val}.")
+
+
 URL_REGEX = r"^http[s]?://\d{12}.(uw2|ew1|cc1|as2).portal.vectra.ai.*$"
 clients = {}
 for client in os.listdir("third_party_clients"):
@@ -86,7 +96,7 @@ for client in os.listdir("third_party_clients"):
         tpc = [
             x
             for x in os.listdir(f"third_party_clients/{client}")
-            if not re.search("_config|__|READ|\.[D|t]", x)
+            if not re.search(r"_config|__|READ|\.[D|t]", x)
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -94,6 +104,8 @@ for client in os.listdir("third_party_clients"):
 Third_Party_Clients = []
 
 for client in THIRD_PARTY_CLIENTS:
+    if not isinstance(THIRD_PARTY_CLIENTS, list):
+        break
     if client in clients:
         module_name = f"third_party_clients.{client}.{clients[client]}"
         Third_Party_Client = importlib.import_module(module_name)
@@ -455,7 +467,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 
         detections = self.get_detections_by_type(detection_types=detection_types)
         for detection in detections.values():
-            host_id = detection["src_host"]["id"]
+            host_id = detection.host_id
             host = self.get_host_by_id(host_id=host_id).json()
             if condition == "and":
                 if host["threat"] > t_score_gte and host["certainty"] > c_score_gte:
@@ -496,7 +508,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 
         detections = self.get_detections_by_type(detection_types=detection_types)
         for detection in detections.values():
-            account_id = detection["src_account"]["id"]
+            account_id = detection.account_id
             account = self.get_account_by_id(account_id=account_id).json()
             if condition == "and":
                 if (
@@ -660,7 +672,9 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
             return detections
         else:
             for detection_type in detection_types:
-                r = self.get_all_detections(detection_type=detection_type, state="active")
+                r = self.get_all_detections(
+                    detection_type=detection_type, state="active"
+                )
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
                         raise HTTPException(page)
@@ -1959,6 +1973,37 @@ if __name__ == "__main__":
 
     logger = logging.getLogger("VAR")
     log_conf(args.debug)
+
+    exit = False
+    for imported_list in [
+        COGNITO_URL,
+        BLOCK_DAYS,
+        THIRD_PARTY_CLIENTS,
+        BLOCK_HOST_DETECTION_TYPES,
+        EXTERNAL_BLOCK_DETECTION_TYPES,
+        BLOCK_ACCOUNT_DETECTION_TYPES,
+    ]:
+        if not isinstance(imported_list, list):
+            TypeException(namestr(imported_list, globals())[0], type([]))
+            exit = True
+
+    for imported_tuple in [
+        BLOCK_HOST_THREAT_CERTAINTY,
+        BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
+        EXTERNAL_BLOCK_HOST_TC,
+        BLOCK_ACCOUNT_THREAT_CERTAINTY,
+        BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE,
+    ]:
+        if not isinstance(imported_tuple, tuple):
+            TypeException(namestr(imported_tuple, globals())[0], type(()))
+            exit = True
+
+    if exit:
+        logger.error(
+            "Correct configurations and re-run. Note that lists should be wrapped in square brackets, [], and tuples wrapped in parentheses, ()."
+        )
+        sys.exit()
+
     if args.no_store_secrets:
         store = False
     else:
