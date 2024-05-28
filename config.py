@@ -39,6 +39,7 @@ BLOCK_HOST_URGENCY = 100
 
 # List of detection types that when present will cause host to be blocked.
 # The second argument enforces a threat/certainty threshold for hosts with those detection types on.
+# BLOCK_HOST_DETECTION_TYPES = ["External Remote Access","Hidden DNS Tunnel"]
 BLOCK_HOST_DETECTION_TYPES = []
 BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, "and", 100)
 
