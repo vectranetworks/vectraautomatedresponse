@@ -2,6 +2,7 @@ import logging
 import uuid
 
 import requests
+from common import _get_password
 from third_party_clients.third_party_interface import ThirdPartyInterface
 
 

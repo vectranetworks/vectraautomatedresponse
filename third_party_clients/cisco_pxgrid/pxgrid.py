@@ -25,7 +25,7 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
-from vectra_automated_response import _get_password
+from common import _get_password
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 

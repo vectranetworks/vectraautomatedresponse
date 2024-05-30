@@ -10,7 +10,7 @@ from third_party_clients.bitdefender.bitdefender_config import (
 )
 from third_party_clients.third_party_interface import ThirdPartyInterface
 
-from vectra_automated_response import _get_password
+from common import _get_password
 
 
 class Client(ThirdPartyInterface):
