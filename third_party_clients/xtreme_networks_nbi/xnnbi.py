@@ -2,9 +2,7 @@ import requests
 import base64
 import json
 import time
-import logging
 from datetime import datetime
-from requests.auth import HTTPBasicAuth
 from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
     CHECK_SSL,
     HOSTNAME,
@@ -13,9 +11,7 @@ from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
-    VectraDetection,
-    VectraHost,
-    VectraStaticIP,
+    VectraStaticIP
 )
 
 from vectra_automated_response import _get_password
