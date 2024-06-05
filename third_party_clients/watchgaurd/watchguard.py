@@ -12,7 +12,7 @@ from third_party_clients.ubiquiti.ubiquiti_config import (
     WATCHGUARD_URL,
 )
 
-from vectra_automated_response import _get_password
+from common import _get_password
 
 
 def request_error_handler(func):

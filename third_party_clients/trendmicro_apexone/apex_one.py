@@ -22,7 +22,7 @@ from third_party_clients.trendmicro_apexone.apex_one_config import (
     BASE_URL,
 )
 
-from vectra_automated_response import _get_password
+from common import _get_password
 
 
 class Client(ThirdPartyInterface):
