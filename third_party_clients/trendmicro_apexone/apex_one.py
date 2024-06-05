@@ -9,6 +9,7 @@ from enum import Enum, auto, unique
 
 import jwt
 import requests
+from common import _get_password
 from requests import HTTPError
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -21,8 +22,6 @@ from third_party_clients.trendmicro_apexone.apex_one_config import (
     API_PATH,
     BASE_URL,
 )
-
-from common import _get_password
 
 
 class Client(ThirdPartyInterface):
@@ -72,40 +71,32 @@ class Client(ThirdPartyInterface):
 
     def block_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn(
-            "Trend Micro client does not implement detection-based blocking"
-        )
+        self.logger.warn("ApexOne client does not implement detection-based blocking")
         return []
 
     def unblock_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn(
-            "Trend Micro client does not implement detection-based blocking"
-        )
+        self.logger.warn("ApexOne client does not implement detection-based blocking")
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Trend Micro client does not implement account-based blocking")
+        self.logger.warn("ApexOne client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Trend Micro client does not implement account-based blocking")
+        self.logger.warn("ApexOne client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn(
-            "Trend Micro client does not implement static IP-based blocking"
-        )
+        self.logger.warn("ApexOne client does not implement static IP-based blocking")
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn(
-            "Trend Micro client does not implement static IP-based blocking"
-        )
+        self.logger.warn("ApexOne client does not implement static IP-based blocking")
         return []
 
     def _patch_endpoint(self, act, mac_address="", ip_address=""):

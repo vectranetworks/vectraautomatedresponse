@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from common import _get_password
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -12,8 +13,6 @@ from third_party_clients.trendmicro_visionone.vision_one_config import (
     BASE_URL,
     VERIFY,
 )
-
-from common import _get_password
 
 
 class Client(ThirdPartyInterface):
@@ -182,43 +181,47 @@ class Client(ThirdPartyInterface):
             return un_isolated
 
     def groom_host(self, host) -> list:
-        self.logger.warning("CloudOne client does not implement host grooming")
+        self.logger.warning("VisionOne client does not implement host grooming")
         return []
 
     def block_detection(self, detection: VectraDetection) -> list:
         # this client only implements Host-based blocking
         self.logger.warning(
-            "CloudOne client does not implement detection-based blocking"
+            "VisionOne client does not implement detection-based blocking"
         )
         return []
 
     def unblock_detection(self, detection: VectraDetection) -> list:
         # this client only implements Host-based blocking
         self.logger.warning(
-            "CloudOne client does not implement detection-based blocking"
+            "VisionOne client does not implement detection-based blocking"
         )
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning("CloudOne client does not implement account-based blocking")
+        self.logger.warning(
+            "VisionOne client does not implement account-based blocking"
+        )
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning("CloudOne client does not implement account-based blocking")
+        self.logger.warning(
+            "VisionOne client does not implement account-based blocking"
+        )
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
         self.logger.warning(
-            "CloudOne client does not implement destination IP blocking"
+            "VisionOne client does not implement destination IP blocking"
         )
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
         self.logger.warning(
-            "CloudOne client does not implement destination IP blocking"
+            "VisionOne client does not implement destination IP blocking"
         )
         return []
