@@ -2,6 +2,7 @@ import requests
 import base64
 import json
 import time
+import logging
 from datetime import datetime
 from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
     CHECK_SSL,
@@ -27,6 +28,7 @@ class Client(ThirdPartyInterface):
         self.secret = _get_password("XNNBI", "Client_Secret", modify=kwargs["modify"])  
         self.timeout = 10
         self.token = None
+        self.logger = logging.getLogger()
         self.expire = 0
         self.renewTime = 90 # in procentage of the max expire time
         self.session = self._login()
