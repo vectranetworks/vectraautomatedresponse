@@ -3,6 +3,7 @@ import logging
 from enum import Enum, auto, unique
 
 import requests
+from common import _get_password
 from requests import HTTPError
 from third_party_clients.fortinet.fortinet_config import (
     EXTERNAL_ADDRESS_GROUP,
@@ -20,8 +21,6 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
-from common import _get_password
-
 
 @unique
 class BlockType(Enum):
@@ -37,7 +36,8 @@ class BlockType(Enum):
 class FortiGate:
     def __init__(self, ipaddr, token, vdom="root", port="443", verify=False):
         self.urlbase = "https://{ipaddr}:{port}".format(ipaddr=ipaddr, port=str(port))
-        self.params = {"access_token": token, "vdom": vdom}
+        self.params = {"vdom": vdom}
+        self.headers = {"Authorization": "Bearer " + token}
         self.verify = verify
         self.logger = logging.getLogger()
 
@@ -56,7 +56,9 @@ class FortiGate:
             api_url += specific
         elif filters:
             params.update({"filter": filters})
-        return requests.get(url=api_url, params=params, verify=self.verify)
+        return requests.get(
+            url=api_url, headers=self.headers, params=params, verify=self.verify
+        )
 
     def create_firewall_address(self, ip_address):
         """
@@ -74,7 +76,8 @@ class FortiGate:
             "end-ip": ip_address,
         }
         return requests.post(
-            "{url}/api/v2/cmdb/firewall/address/".format(url=self.urlbase),
+            url="{url}/api/v2/cmdb/firewall/address/".format(url=self.urlbase),
+            headers=self.headers,
             json=data,
             params=self.params,
             verify=False,
@@ -92,8 +95,9 @@ class FortiGate:
             url="{url}/api/v2/cmdb/firewall/address/{address}".format(
                 url=self.urlbase, address=address
             ),
-            verify=False,
+            headers=self.headers,
             params=self.params,
+            verify=False,
         )
 
     def get_address_group(self, specific=False, filters=False):
@@ -112,7 +116,9 @@ class FortiGate:
         elif filters:
             params.update({"filter": filters})
 
-        return requests.get(url=api_url, params=params, verify=self.verify)
+        return requests.get(
+            url=api_url, headers=self.headers, params=params, verify=self.verify
+        )
 
     def update_address_group(self, group_name, member_list):
         """
@@ -128,6 +134,7 @@ class FortiGate:
         )
         return requests.put(
             url=api_url,
+            headers=self.headers,
             json={"member": member_list},
             params=self.params,
             verify=self.verify,
