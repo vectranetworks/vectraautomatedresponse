@@ -81,8 +81,10 @@ class Client(ThirdPartyInterface):
         query getMAC {{
             accessControl {{
                 endSystemByIp(ipAddress:"{ip_address}"){{
-                    ipAddress
-                    macAddress
+                    endSystem {{
+                        ipAddress
+                        macAddress
+                    }}
                 }}
             }}
         }}
