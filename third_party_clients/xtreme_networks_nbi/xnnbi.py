@@ -79,16 +79,16 @@ class Client(ThirdPartyInterface):
     def _get_mac_from_ip(self, ip_address: str):
         mac_to_ip_query = f'''
         query getMAC {{
-            network {{
-                devices:device(ip:"{ip_address}"){{
-                    ip
-                    baseMac
+            accessControl {{
+                endSystemByIp(ipAddress:"{ip_address}"){{
+                    ipAddress
+                    macAddress
                 }}
             }}
         }}
         '''
         r = self._query(mac_to_ip_query)
-        return r.json()['data']['network']['devices']['baseMac']
+        return r.json()['data']['accessControl']['endSystemByIp']['macAddress']
     
     def _add_mac_to_blacklist(self, mac_address:str):
         block_device_query = f'''
