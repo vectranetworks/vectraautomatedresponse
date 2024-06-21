@@ -76,7 +76,7 @@ class Client(ThirdPartyInterface):
         return mac_addresses
 
     def unblock_host(self, host):
-        mac_addresses = host.blocked_elements.get(self.__class__.__name__, [])
+        mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
             self._patch_endpoint(mac_address, isolated=False)
             self._disconnect_session(mac_address)
