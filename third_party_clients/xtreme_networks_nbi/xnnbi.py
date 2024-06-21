@@ -20,6 +20,7 @@ from vectra_automated_response import _get_password
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
+        self.name = "XtremeNBI"
         self.nbiUrl = 'https://' + HOSTNAME + ':8443/nbi/graphql'
         self.host = HOSTNAME
         self.port  = 8443
@@ -90,7 +91,7 @@ class Client(ThirdPartyInterface):
         }}
         '''
         r = self._query(mac_to_ip_query)
-        return r.json()['data']['accessControl']['endSystemByIp']['macAddress']
+        return r.json()['data']['accessControl']['endSystemByIp']['endSystem']['macAddress']
     
     def _add_mac_to_blacklist(self, mac_address:str):
         block_device_query = f'''
@@ -134,9 +135,9 @@ class Client(ThirdPartyInterface):
         return blocked_addresses
 
     def unblock_host(self, host):
-        mac_addresses = host.blocked_elements.get(self.__class__.__name__, [])
+        mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
-            self._remove_mac_from_blacklist(mac_address, isolated=False)
+            self._remove_mac_from_blacklist(mac_address)
         return mac_addresses
 
     def groom_host(self, host) -> dict:
