@@ -194,7 +194,7 @@ class Client(ThirdPartyInterface):
         return [ip_address]
 
     def unblock_host(self, host):
-        ip_addresses = host.blocked_elements.get(self.__class__.__name__, [])
+        ip_addresses = host.blocked_elements.get(self.name, [])
         self.logger.debug("ip_address:{}".format(ip_addresses))
         if len(ip_addresses) < 1:
             self.logger.error("No IP address found for host {}".format(host.name))
@@ -235,7 +235,7 @@ class Client(ThirdPartyInterface):
         return ip_addresses
 
     def unblock_detection(self, detection):
-        ip_addresses = detection.blocked_elements.get(self.__class__.__name__, [])
+        ip_addresses = detection.blocked_elements.get(self.name, [])
         if len(ip_addresses) < 1:
             self.logger.error(
                 "No IP address found for detection ID {}".format(detection.id)

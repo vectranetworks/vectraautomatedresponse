@@ -239,7 +239,7 @@ class Client(ThirdPartyInterface):
             return blocked_list
 
     def unblock_host(self, host):
-        blocked_elements = host.blocked_elements.get(self.__class__.__name__, [])
+        blocked_elements = host.blocked_elements.get(self.name, [])
         unblocked_elements = []
         for client_network in blocked_elements:
             self.logger.debug("client_network from tag:{}".format(client_network))

@@ -68,7 +68,7 @@ class Client(ThirdPartyInterface):
             return []
 
     def unblock_host(self, host) -> list[str]:
-        host_fmc_id = host.blocked_elements.get(self.__class__.__name__, [])[0]
+        host_fmc_id = host.blocked_elements.get(self.name, [])[0]
         self.logger.info(
             f"Processing unblock request for IP: {host.ip} / ID: {host_fmc_id}"
         )

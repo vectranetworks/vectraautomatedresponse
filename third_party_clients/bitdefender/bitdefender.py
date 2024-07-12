@@ -105,7 +105,7 @@ class Client(ThirdPartyInterface):
         return endpoint_ids
 
     def unblock_host(self, host):
-        endpoint_ids = host.blocked_elements.get(self.__class__.__name__, [])
+        endpoint_ids = host.blocked_elements.get(self.name, [])
         for endpoint_id in endpoint_ids:
             if endpoint_id:
                 self.logger.info(

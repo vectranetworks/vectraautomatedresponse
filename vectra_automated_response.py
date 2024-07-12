@@ -1321,6 +1321,8 @@ class VectraAutomatedResponse(object):
             for third_party_client in self.third_party_clients:
                 try:
                     unblocked_elements = third_party_client.unblock_host(host)
+                    if unblocked_elements is None:
+                        unblocked_elements = []
                     if len(unblocked_elements) > 0:
                         for element in unblocked_elements:
                             blocked_elements[third_party_client.name].remove(element)
@@ -1374,6 +1376,8 @@ class VectraAutomatedResponse(object):
                     )
                     self.logger.error(message)
                     self.err_msg.append(message)
+                except KeyError:
+                    pass
 
     def groom_hosts(self, hosts_to_groom):
         for host_id, host in hosts_to_groom.items():

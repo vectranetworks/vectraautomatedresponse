@@ -47,7 +47,7 @@ class Client(ThirdPartyInterface):
         return [cguid]
 
     def unblock_host(self, host) -> list[str]:
-        cguid = host.blocked_elements.get(self.__class__.__name__, [])[0]
+        cguid = host.blocked_elements.get(self.name, [])[0]
         if cguid is None:
             self.logger.error("Could not identify unique connector_guid. Skipping host.")
             return []
