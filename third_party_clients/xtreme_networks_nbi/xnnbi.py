@@ -1,84 +1,95 @@
-import requests
 import base64
 import json
-import time
 import logging
+import time
 from datetime import datetime
-from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
-    CHECK_SSL,
-    HOSTNAME,
-)
 
+import requests
+from common import _get_password
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
-    VectraStaticIP
+    VectraStaticIP,
 )
-
-from common import _get_password
+from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
+    CHECK_SSL,
+    HOSTNAME,
+    PORT,
+)
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "XtremeNBI"
-        self.nbiUrl = 'https://' + HOSTNAME + ':8443/nbi/graphql'
-        self.host = HOSTNAME
-        self.port  = 8443
+        self.base_url = "https://{}:{}".format(HOSTNAME, PORT)
+        self.nbiUrl = self.base_url + "/nbi/graphql"
         self.verify = CHECK_SSL
-        self.clientId = _get_password("XNNBI", "Client_ID", modify=kwargs["modify"])  
-        self.secret = _get_password("XNNBI", "Client_Secret", modify=kwargs["modify"])  
+        self.clientId = _get_password("XNNBI", "Client_ID", modify=kwargs["modify"])
+        self.secret = _get_password("XNNBI", "Client_Secret", modify=kwargs["modify"])
         self.timeout = 10
         self.token = None
         self.logger = logging.getLogger()
         self.expire = 0
-        self.renewTime = 90 # in procentage of the max expire time
+        self.renewTime = 90  # in procentage of the max expire time
         self.session = self._login()
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
     def _computeExpireTime(self, TimeStart, TimeEnd):
-        '''internal use only'''
+        """internal use only"""
         timeDiff = TimeEnd - TimeStart
-        unixtime = time.mktime( datetime.today().timetuple() )
-        return     unixtime + ( timeDiff.total_seconds() / 100 * self.renewTime )
+        unixtime = time.mktime(datetime.today().timetuple())
+        return unixtime + (timeDiff.total_seconds() / 100 * self.renewTime)
 
     def _ifExpire(self):
-        '''internal use only'''
-        if self.expire > time.mktime( datetime.today().timetuple() ):
+        """internal use only"""
+        if self.expire > time.mktime(datetime.today().timetuple()):
             return False
         else:
             return True
 
     def _login(self):
-        '''internal use only'''
-        token_url = 'https://'+ self.host +':'+ str(self.port) +'/oauth/token/access-token?grant_type=client_credentials'
-        headers   = {"Content-Type" : "application/x-www-form-urlencoded"}
-        response = requests.post(token_url, auth=(self.clientId, self.secret), headers=headers, verify=self.verify)
+        """internal use only"""
+        token_url = (
+            self.base_url + "/oauth/token/access-token?grant_type=client_credentials"
+        )
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        response = requests.post(
+            token_url,
+            auth=(self.clientId, self.secret),
+            headers=headers,
+            verify=self.verify,
+        )
         response.raise_for_status()
         result = response.json()
-        self.token = result.get('access_token')
-        xmcTokenElements = self.token.split('.')
-        tokenData = json.loads(base64.b64decode(xmcTokenElements[1]+ "==") )
-        self.expire = self._computeExpireTime(datetime.fromtimestamp( tokenData['iat'] ), datetime.fromtimestamp( tokenData['exp'] ) )
+        self.token = result.get("access_token")
+        xmcTokenElements = self.token.split(".")
+        tokenData = json.loads(base64.b64decode(xmcTokenElements[1] + "=="))
+        self.expire = self._computeExpireTime(
+            datetime.fromtimestamp(tokenData["iat"]),
+            datetime.fromtimestamp(tokenData["exp"]),
+        )
         session = requests.Session()
         session.verify = False
         session.timeout = self.timeout
-        session.headers.update({
-            'Accept': 'application/json',
-            'Content-type': 'application/json',
-            'Authorization':'Bearer ' + self.token,
-            'Cache-Control': 'no-cache',
-            })
+        session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-type": "application/json",
+                "Authorization": "Bearer " + self.token,
+                "Cache-Control": "no-cache",
+            }
+        )
         return session
 
     def _query(self, query: str):
         if self._ifExpire():
-            self.expire  = 0
+            self.expire = 0
             self.session = self._login()
-        return self.session.post(self.nbiUrl, json = {'query': query})
-    
+        return self.session.post(self.nbiUrl, json={"query": query})
+
     def _get_mac_from_ip(self, ip_address: str):
-        mac_to_ip_query = f'''
+        mac_to_ip_query = f"""
         query getMAC {{
             accessControl {{
                 endSystemByIp(ipAddress:"{ip_address}"){{
@@ -89,12 +100,14 @@ class Client(ThirdPartyInterface):
                 }}
             }}
         }}
-        '''
+        """
         r = self._query(mac_to_ip_query)
-        return r.json()['data']['accessControl']['endSystemByIp']['endSystem']['macAddress']
-    
-    def _add_mac_to_blacklist(self, mac_address:str):
-        block_device_query = f'''
+        return r.json()["data"]["accessControl"]["endSystemByIp"]["endSystem"][
+            "macAddress"
+        ]
+
+    def _add_mac_to_blacklist(self, mac_address: str):
+        block_device_query = f"""
             mutation blockMAC {{
                 accessControl {{
                     addMACToBlacklist(input: {{value:"{mac_address}", reauthenticate:true}}){{
@@ -104,12 +117,12 @@ class Client(ThirdPartyInterface):
                     }}
                 }}
             }}
-            '''
+            """
         r = self._query(block_device_query)
-        return int(r.json()['data']['accessControl']['addMACToBlacklist']['errorCode'])
-    
-    def _remove_mac_from_blacklist(self, mac_address:str):
-        unblock_device_query = f'''
+        return int(r.json()["data"]["accessControl"]["addMACToBlacklist"]["errorCode"])
+
+    def _remove_mac_from_blacklist(self, mac_address: str):
+        unblock_device_query = f"""
             mutation unblockMAC {{
                 accessControl {{
                     removeMACFromBlacklist(input: {{value:"{mac_address}", reauthenticate:true}}){{
@@ -119,10 +132,12 @@ class Client(ThirdPartyInterface):
                     }}
                 }}
             }}
-        '''
+        """
         r = self._query(unblock_device_query)
-        return int(r.json()['data']['accessControl']['removeMACFromBlacklist']['errorCode'])
-        
+        return int(
+            r.json()["data"]["accessControl"]["removeMACFromBlacklist"]["errorCode"]
+        )
+
     def block_host(self, host):
         ip_address = host.ip
         mac_addresses = set(host.mac_addresses)
