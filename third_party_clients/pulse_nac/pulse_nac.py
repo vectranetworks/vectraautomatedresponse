@@ -183,7 +183,7 @@ class Client(ThirdPartyInterface):
 
     def unblock_host(self, host):
         # mac_addresses = host.mac_addresses
-        mac_addresses = host.blocked_elements.get(self.__class__.__name__, [])
+        mac_addresses = host.blocked_elements.get(self.name, [])
         if len(mac_addresses) < 1:
             mac_addresses = self._retrieve_endpoint(host.ip)
             self.logger.debug(

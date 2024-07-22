@@ -154,7 +154,7 @@ class Client(ThirdPartyInterface):
             return []
 
     def unblock_host(self, host: VectraHost) -> list:
-        comp_ids = host.blocked_elements.get(self.__class__.__name__, [])
+        comp_ids = host.blocked_elements.get(self.name, [])
         un_isolated = []
         if len(comp_ids) >= 1:
             for comp_id in comp_ids:

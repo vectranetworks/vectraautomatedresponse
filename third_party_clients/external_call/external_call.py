@@ -75,7 +75,7 @@ class Client(ThirdPartyInterface):
             cmd.append(host.ip)
             r = subprocess.run(cmd)
             if r.returncode == 0:
-                return host.blocked_elements.get(self.__class__.__name__)
+                return host.blocked_elements.get(self.name)
             else:
                 self.logger.warning(
                     "Execution of unblock_host command: {} was not successful".format(
@@ -98,7 +98,7 @@ class Client(ThirdPartyInterface):
             cmd.append(account.context)
             r = subprocess.run(cmd)
             if r.returncode == 0:
-                return account.blocked_elements.get(self.__class__.__name__)
+                return account.blocked_elements.get(self.name)
             else:
                 self.logger.warning(
                     "Execution of block_account command: {} was not successful".format(
@@ -139,7 +139,7 @@ class Client(ThirdPartyInterface):
             cmd.append(detection.dst_ips)
             r = subprocess.run(cmd)
             if r.returncode == 0:
-                return detection.blocked_elements.get(self.__class__.__name__)
+                return detection.blocked_elements.get(self.name)
             else:
                 self.logger.warning(
                     "Execution of unblock_detection command: {} was not successful".format(

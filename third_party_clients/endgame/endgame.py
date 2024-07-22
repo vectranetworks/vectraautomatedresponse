@@ -53,7 +53,7 @@ class Client(ThirdPartyInterface):
         return [ip_address]
 
     def unblock_host(self, host):
-        ip_addresses = host.blocked_elements.get(self.__class__.__name__, [])
+        ip_addresses = host.blocked_elements.get(self.name, [])
         if len(ip_addresses) < 1:
             self.logger.error("No IP address found for host {}".format(host.name))
         for ip_address in ip_addresses:
@@ -85,7 +85,7 @@ class Client(ThirdPartyInterface):
         return ip_addresses
 
     def unblock_detection(self, detection):
-        ip_addresses = detection.blocked_elements.get(self.__class__.__name__, [])
+        ip_addresses = detection.blocked_elements.get(self.name, [])
         if len(ip_addresses) < 1:
             self.logger.error(
                 "No IP address found for Detection ID {}".format(detection.id)

@@ -29,7 +29,7 @@ class Client(ThirdPartyInterface):
 
     def unblock_host(self, host):
         self.logger.warn("Client cannot restart a machine automatically")
-        return host.blocked_elements.get(self.__class__.__name__)
+        return host.blocked_elements.get(self.name)
 
     def groom_host(self, host) -> dict:
         self.logger.warning("Windows Shutdown client does not implement host grooming")
