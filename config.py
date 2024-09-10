@@ -7,9 +7,10 @@ SLEEP_MINUTES = 5
 # All brains must use the same API version. Run a different instance of this script for each API version
 V3 = False
 # Available options: ['bitdefender', 'cisco_amp', 'cisco_fmc', 'cisco_ise',
-# 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
+# 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet', 'forti_edr',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
-# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements', 'xtreme_networks_nbi]
+# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements',
+# 'xtreme_networks_nbi']
 THIRD_PARTY_CLIENTS = ["test_client"]
 
 ### ALLOWED BLOCKING WINDOW

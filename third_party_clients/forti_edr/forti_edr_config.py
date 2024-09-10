@@ -1,0 +1,3 @@
+BASE_URL = ""
+ORGANIZATION = ""
+VERIFY = False
