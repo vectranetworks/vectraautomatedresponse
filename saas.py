@@ -63,7 +63,14 @@ def param_deprecation(key):
 
 
 class VectraSaaSClient(object):
-    def __init__(self, url=None, client_id=None, secret_key=None, verify=False):
+    def __init__(
+        self,
+        url=None,
+        client_id=None,
+        secret_key=None,
+        rux_tokens={},
+        verify=False,
+    ):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
@@ -76,7 +83,10 @@ class VectraSaaSClient(object):
         self.version = 3
         self.url = f"{url}/api/v{self.version}"
         self.verify = verify
-        self._access = None
+        self._access = rux_tokens.get("_access", None)
+        self._accessTime = rux_tokens.get("_accessTime", None)
+        self._refresh = rux_tokens.get("_refresh", None)
+        self._refreshTime = rux_tokens.get("_refreshTime", None)
 
         self.token_headers = {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -155,6 +165,7 @@ class VectraSaaSClient(object):
     def _check_token(self):
         if not self._access:
             self._get_token()
+
         if self._accessTime < int(time.time()):
             self._refresh_token()
 
@@ -1338,7 +1349,9 @@ class VectraSaaSClient(object):
 
 
 class VectraSaaSClientV3_1(VectraSaaSClient):
-    def __init__(self, url=None, client_id=None, secret_key=None, verify=False):
+    def __init__(
+        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+    ):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
@@ -1347,7 +1360,11 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
-            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            rux_tokens=rux_tokens,
+            verify=verify,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
         self.base_url = url
@@ -1479,7 +1496,9 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
 
 
 class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
-    def __init__(self, url=None, client_id=None, secret_key=None, verify=False):
+    def __init__(
+        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+    ):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
@@ -1488,7 +1507,11 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
-            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            rux_tokens=rux_tokens,
+            verify=verify,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
         self.base_url = url
@@ -1674,7 +1697,9 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
 
 
 class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
-    def __init__(self, url=None, client_id=None, secret_key=None, verify=False):
+    def __init__(
+        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+    ):
         """
         Initialize Vectra Saas client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
@@ -1683,7 +1708,11 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
-            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            verify=verify,
+            rux_tokens=rux_tokens,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
         self.base_url = url
