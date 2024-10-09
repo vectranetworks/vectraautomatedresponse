@@ -74,7 +74,7 @@ class Client(ThirdPartyInterface):
             return {}
 
     def __init__(self, **kwargs):
-        self.name("Meraki Client")
+        self.name = "Meraki Client"
         self.urlbase = MERAKI_URL.strip("/")
         self.token = _get_password("Meraki", "API_Key", modify=kwargs["modify"])
         self.headers = {
