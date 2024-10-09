@@ -636,7 +636,7 @@ class Client(ThirdPartyInterface):
                         ports.content
                     )
                 )
-        if client.get("ssid") and client.get("recentDeviceConnection") == "WLAN":
+        if client.get("ssid") and client.get("recentDeviceConnection") in ["WLAN","Wireless"]:
             return "WLAN", True
         else:
             return "unknown", False
