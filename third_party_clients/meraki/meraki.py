@@ -317,7 +317,7 @@ class Client(ThirdPartyInterface):
         self.logger.info(
             "Groom host called.  Host tags: {}".format(host.blocked_elements)
         )
-        meraki_blocked_elements = host.blocked_elements.get("MerakiClient")
+        meraki_blocked_elements = host.blocked_elements.get("Meraki Client")
         if meraki_blocked_elements:
             clients_list = self._get_client_id(
                 host.ip, host.mac_addresses, host.last_seen_ts_utc
