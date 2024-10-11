@@ -563,7 +563,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :param block_tag: tag defining hosts that need to be blocked - optional
         :param min_tc_score: tuple of (threat, certainty) to query hosts exceeding this threshold - optional
         :param min_urgency_score: urgency to query hosts exceeding this threshold - optional
-        :param block_host_detection_types: list of detections types which if present on a host will cause the host to be blocked - optional
+        :param block_host_detection_types: list of detections types which the host to be blocked - optional
         :rtype: HostDict
         """
 
@@ -822,11 +822,11 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         min_urgency_score: int = None,
     ) -> DetectionDict:
         """
-        Get a dict of all detection IDs which should be blocked given the parameters. 
+        Get a dict of all detection IDs which should be blocked given the parameters.
         :param block_tag: tag defining detections which should be blocked or unblocked - optional
         :param detection_types_to_block: list of detection types to block, regardless of score
         :param min_host_tc_score: tuple (int, int) of min host threat/certainty score for which,\
-            if exceeded to block all detections on host. 
+            if exceeded to block all detections on host.
         :rtype: DetectionDict
         """
         tagged_detections = (
@@ -1274,8 +1274,8 @@ class VectraAutomatedResponse(object):
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
-                        # Set a "VAR Host Blocked" to set the host as being blocked and registered what elements were blocked in
-                        # separate tags
+                        # Set a "VAR Host Blocked" to set the host as being blocked and
+                        # register what elements were blocked in separate tags
                         tag_to_set = host.tags
                         tag_to_set.append("VAR Host Blocked")
                         for element in blocked_elements:
@@ -1483,8 +1483,8 @@ class VectraAutomatedResponse(object):
                         self.logger.info(message)
                         self.info_msg.append(message)
 
-                        # Set a "VAR Account Blocked" to set the account as being blocked and registered what elements were blocked
-                        # in separate tags
+                        # Set a "VAR Account Blocked" to set the account as being blocked and
+                        # register what elements were blocked in separate tags
                         tag_to_set = account.tags
                         tag_to_set.append("VAR Account Blocked")
 
@@ -1583,8 +1583,8 @@ class VectraAutomatedResponse(object):
                         detection=detection
                     )
                     if len(blocked_elements) > 0:
-                        # Set a "VAR Detection Blocked" to set the detection as being blocked and registered what elements were
-                        # blocked in separate tags
+                        # Set a "VAR Detection Blocked" to set the detection as being blocked
+                        # and register what elements were blocked in separate tags
                         tag_to_set = detection.tags
                         tag_to_set.append("VAR Detection Blocked")
                         if len(blocked_elements) < 1:
@@ -1989,7 +1989,9 @@ if __name__ == "__main__":
 
     if exit:
         logger.error(
-            "Correct configurations and re-run. Note that lists should be wrapped in square brackets, [], and tuples wrapped in parentheses, ()."
+            "Correct configurations and re-run.\
+             Note that lists should be wrapped in square brackets, [], \
+             and tuples wrapped in parentheses, ()."
         )
         sys.exit()
 
