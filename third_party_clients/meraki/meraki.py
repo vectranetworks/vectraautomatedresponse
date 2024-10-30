@@ -74,7 +74,7 @@ class Client(ThirdPartyInterface):
             return {}
 
     def __init__(self, **kwargs):
-        self.name("Meraki Client")
+        self.name = "Meraki Client"
         self.urlbase = MERAKI_URL.strip("/")
         self.token = _get_password("Meraki", "API_Key", modify=kwargs["modify"])
         self.headers = {
@@ -317,7 +317,7 @@ class Client(ThirdPartyInterface):
         self.logger.info(
             "Groom host called.  Host tags: {}".format(host.blocked_elements)
         )
-        meraki_blocked_elements = host.blocked_elements.get("MerakiClient")
+        meraki_blocked_elements = host.blocked_elements.get("Meraki Client")
         if meraki_blocked_elements:
             clients_list = self._get_client_id(
                 host.ip, host.mac_addresses, host.last_seen_ts_utc
@@ -636,7 +636,7 @@ class Client(ThirdPartyInterface):
                         ports.content
                     )
                 )
-        if client.get("ssid") and client.get("recentDeviceConnection") == "WLAN":
+        if client.get("ssid") and client.get("recentDeviceConnection") in ["WLAN","Wireless"]:
             return "WLAN", True
         else:
             return "unknown", False
