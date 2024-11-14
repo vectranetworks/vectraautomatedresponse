@@ -6,7 +6,7 @@ charset-normalizer==3.3.2
 colorlog==6.8.2
 cryptography==42.0.5
 cybox==2.1.0.21
-fortiedr=3.9
+fortiedr==3.9
 furl==2.1.3
 idna==3.6
 importlib_metadata==7.1.0
