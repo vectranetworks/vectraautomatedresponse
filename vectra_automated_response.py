@@ -85,7 +85,6 @@ class TypeException(TypeError):
         logger.error(f"{imported_list} is not of {val}.")
 
 
-URL_REGEX = r"^http[s]?://\d{12}.(uw2|ew1|cc1|as2).portal.vectra.ai.*$"
 clients = {}
 for client in os.listdir("third_party_clients"):
     if client not in [
@@ -98,7 +97,7 @@ for client in os.listdir("third_party_clients"):
         tpc = [
             x
             for x in os.listdir(f"third_party_clients/{client}")
-            if not re.search(r"_config|__|READ|\.[D|t]", x)
+            if not re.search(r"_config|__|READ|\.[D|t]", x) and x.endswith('.py')
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -209,7 +208,7 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :param secret_key: V3 API Secret Key for authentication - required
         :param verify: verify SSL - optional
         """
-        if re.match(URL_REGEX, url, re.IGNORECASE):
+        if V3:
             rux_tokens = get_rux_tokens()
             super().__init__(url, client_id, secret_key, rux_tokens, verify)
         else:
@@ -2033,7 +2032,7 @@ if __name__ == "__main__":
     vectra_api_clients = []
     for url in COGNITO_URL:
         logger.debug(f"Configuring Vectra API Client for {url}")
-        if re.match(URL_REGEX, url, re.IGNORECASE):
+        if V3:
             vectra_api_clients.append(
                 VectraClient(
                     url=url,
@@ -2045,7 +2044,7 @@ if __name__ == "__main__":
             vectra_api_clients.append(
                 VectraClient(
                     url,
-                    _get_password(url, "Token", modify=modify),
+                    _get_password(url, "APIv2 Token", modify=modify),
                 )
             )
 
