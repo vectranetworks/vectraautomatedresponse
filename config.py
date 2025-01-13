@@ -5,7 +5,7 @@ LOG_TO_FILE = False
 LOG_FILE = "var.log"
 SLEEP_MINUTES = 5
 # All brains must use the same API version. Run a different instance of this script for each API version
-V3 = False
+V3 = True
 # Available options: ['bitdefender', 'cisco_amp', 'cisco_fmc', 'cisco_ise',
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet', 'forti_edr',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',

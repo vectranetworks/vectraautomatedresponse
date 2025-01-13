@@ -2,8 +2,11 @@ import json
 import re
 import time
 import warnings
-
+import logging
+import keyring
 import requests
+import vat.vectra as vectra
+from requests.auth import HTTPBasicAuth
 
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
@@ -52,6 +55,44 @@ def request_error_handler(func):
 
     return request_handler
 
+def renew_access_token(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPUnauthorizedException as e:
+            # To calculate token expiration we take 10s margin
+            if not self.refresh_token or (
+                self.access_token_validity - time.time() > 10.0
+                and self.refresh_token_validity - time.time() > 10.0
+            ):
+                raise
+            elif self.refresh_token_validity - time.time() < 10.0:
+                self.logger.debug('Refresh token expired, re-doing OAuth')
+                self._get_oauth_token()
+                # Once the token is refreshed, we can retry the operation.
+                return func(self, *args, **kwargs)
+            else:
+                self.logger.debug('Access token expired, refreshing with refresh token')
+                self._refresh_oauth_token()  # This resets the validity, so we don't retry indefinitely
+                # Once the token is refreshed, we can retry the operation.
+                return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            time.sleep(1)
+            return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def aws_cognito_timeout(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            time.sleep(15)
+            return func(self, *args, **kwargs)
+
+    return wrapper
+
 
 def deprecation(message):
     warnings.warn(message, PendingDeprecationWarning)
@@ -62,13 +103,14 @@ def param_deprecation(key):
     warnings.warn(message, PendingDeprecationWarning)
 
 
-class VectraSaaSClient(object):
+
+
+class VectraSaaSClient(vectra.ClientV2_latest):
     def __init__(
         self,
         url=None,
         client_id=None,
         secret_key=None,
-        rux_tokens={},
         verify=False,
     ):
         """
@@ -80,16 +122,23 @@ class VectraSaaSClient(object):
         """
         url = VectraSaaSClient._remove_trailing_slashes(url)
         self.base_url = url
+        self.logger = logging.getLogger()
         self.version = 3
         self.url = f"{url}/api/v{self.version}"
         self.verify = verify
-        self._access = rux_tokens.get("_access", None)
-        self._accessTime = rux_tokens.get("_accessTime", None)
-        self._refresh = rux_tokens.get("_refresh", None)
-        self._refreshTime = rux_tokens.get("_refreshTime", None)
-
-        self.token_headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
+        self.client_id = client_id
+        self.secret_key = secret_key
+        self.access_token = VectraSaaSClient._get_keyring_password(url, "rux_access_token")
+        self.refresh_token = VectraSaaSClient._get_keyring_password(url,"rux_refresh_token")
+        # Retrieve expiration times and cast back to float
+        self.access_token_validity = float(VectraSaaSClient._get_keyring_password(url,"rux_access_token_validity")) if VectraSaaSClient._get_keyring_password(url,"rux_access_token_validity") else None
+        self.refresh_token_validity = float(VectraSaaSClient._get_keyring_password(url,"rux_refresh_token_validity")) if VectraSaaSClient._get_keyring_password(url,"rux_refresh_token_validity") else None
+  
+        # Setup authorization in headers
+        self.headers = {
+            "Authorization": self.access_token,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
         }
 
         if client_id and secret_key:
@@ -100,6 +149,18 @@ class VectraSaaSClient(object):
             )
 
     @staticmethod
+    def _get_keyring_password(system, username):
+        """
+        Wrapper around keyring, since it can return either None or '' on an unset keyring entry,
+        depending whether this entry was previously used or not
+        """
+        response = keyring.get_password(system, username)
+        if response is None or response == '':
+            return None
+        else:
+            return response
+
+    @staticmethod
     def _remove_trailing_slashes(url):
         if ":/" not in url:
             url = "https://" + url
@@ -108,6 +169,59 @@ class VectraSaaSClient(object):
         url = url[:-1] if url.endswith("/") else url
         return url
 
+    @aws_cognito_timeout
+    @request_error_handler
+    def _get_oauth_token_request(self):
+        data = {"grant_type": "client_credentials"}
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        }
+        url = f"{self.base_url}/oauth2/token"
+        return requests.post(
+            url,
+            headers=headers,
+            data=data,
+            auth=HTTPBasicAuth(self.client_id, self.secret_key),
+            verify=self.verify,
+        )
+
+    def _get_oauth_token(self):
+        # Get the OAuth2 token
+        r_dict = self._get_oauth_token_request().json()
+        self.access_token = r_dict.get("access_token")
+        self.refresh_token = r_dict.get("refresh_token")
+        self.access_token_validity = time.time() + r_dict.get("expires_in")
+        self.refresh_token_validity = time.time() + r_dict.get("refresh_expires_in")
+        self.headers["Authorization"] = "Bearer " + self.access_token
+        # Save in Keyring
+        self.logger.debug('Saving to keyring')
+        keyring.set_password(self.base_url,"rux_access_token", self.access_token)
+        keyring.set_password(self.base_url,"rux_refresh_token", self.refresh_token)
+        keyring.set_password(self.base_url,"rux_access_token_validity", str(self.access_token_validity)) #keyring only stores Strings
+        keyring.set_password(self.base_url,"rux_refresh_token_validity", str(self.refresh_token_validity))
+
+
+    @aws_cognito_timeout
+    @request_error_handler
+    def _refresh_oauth_token_request(self):
+        data = {"grant_type": "refresh_token", "refresh_token": self.refresh_token}
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        }
+        url = f"{self.base_url}/oauth2/token"
+        return requests.post(url, headers=headers, data=data, verify=self.verify)
+
+    def _refresh_oauth_token(self):
+        r_dict = self._refresh_oauth_token_request().json()
+        token = r_dict.get("access_token")
+        self.access_token_validity = time.time() + r_dict.get("expires_in")
+        # Saving updated value to keyring
+        keyring.set_password(self.base_url,"rux_access_token_validity", str(self.access_token_validity)) #keyring only stores Strings
+        self.headers["Authorization"] = "Bearer " + token
+
+    @renew_access_token
     @request_error_handler
     def _request(self, method, url, **kwargs):
         """
@@ -115,116 +229,20 @@ class VectraSaaSClient(object):
         This is used by paginated endpoints
         :rtype: requests.Response
         """
-        self._check_token()
         if method not in ["get", "patch", "put", "post", "delete"]:
             raise ValueError("Invalid requests method provided")
 
-        if "headers" in kwargs:
+        if not self.access_token:
+            # Get the OAuth2 token
+            self._get_oauth_token()
+
+        if "headers" in kwargs.keys():
             headers = kwargs.pop("headers")
         else:
-            headers = {
-                "Authorization": f"Bearer {self._access}",
-                "Content-Type": "application/json",
-            }
+            headers = self.headers
         return requests.request(
             method=method, url=url, headers=headers, verify=self.verify, **kwargs
         )
-
-    def _sleep(self, timeout):
-        time.sleep(timeout)
-
-    def _refresh_token(self):
-        if self._refreshTime > int(time.time()):
-            data = {"grant_type": "refresh_token", "refresh_token": self._refresh}
-            response = requests.post(
-                url=f"{self.base_url}/oauth2/token",
-                headers=self.token_headers,
-                auth=self.auth,
-                data=data,
-            )
-            token_data = response.json()
-            self._access = token_data["access_token"]
-            self._accessTime = int(time.time()) + token_data["expires_in"] - 100
-        else:
-            self._get_token()
-
-    def _get_token(self):
-        data = {"grant_type": "client_credentials"}
-        response = requests.post(
-            url=f"{self.base_url}/oauth2/token",
-            headers=self.token_headers,
-            auth=self.auth,
-            data=data,
-        )
-        token_data = response.json()
-        self._access = token_data["access_token"]
-        self._refresh = token_data["refresh_token"]
-        self._accessTime = int(time.time()) + token_data["expires_in"] - 100
-        self._refreshTime = int(time.time()) + token_data["refresh_expires_in"] - 100
-
-    def _check_token(self):
-        if not self._access:
-            self._get_token()
-
-        if self._accessTime < int(time.time()):
-            self._refresh_token()
-
-    @staticmethod
-    def _generate_detection_params(args):
-        """
-        Generate query parameters for detections based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-        """
-        params = {}
-        valid_keys = [
-            "c_score",
-            "c_score_gte",
-            "category",
-            "certainty",
-            "certainty_gte",
-            "destination",
-            "detection_category",
-            "detection_type",
-            "fields",
-            "host_id",
-            "id",
-            "is_targeting_key_asset",
-            "last_timestamp",
-            "max_id",
-            "min_id",
-            "note_modified_timestamp_gte",
-            "ordering",
-            "page",
-            "page_size",
-            "proto",
-            "src_account",
-            "src_ip",
-            "state",
-            "t_score",
-            "t_score_gte",
-            "tags",
-            "threat_gte",
-            "threat_score",
-        ]
-        deprecated_keys = [
-            "c_score",
-            "c_score_gte",
-            "category",
-            "t_score",
-            "t_score_gte",
-        ]
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f"argument {str(k)} is an invalid detection query parameter"
-                )
-            if k in deprecated_keys:
-                param_deprecation(k)
-        return params
 
     @staticmethod
     def _generate_account_params(args):
@@ -266,51 +284,6 @@ class VectraSaaSClient(object):
                 )
             if k in deprecated_keys:
                 param_deprecation(k)
-        return params
-
-    @staticmethod
-    def _generate_rule_params(args):
-        """
-        Generate query parameters for rules based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-        """
-        params = {}
-        valid_keys = [
-            "contains",
-            "fields",
-            "include_templates",
-            "page",
-            "page_size",
-            "ordering",
-        ]
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f"argument {str(k)} is an invalid rule query parameter"
-                )
-        return params
-
-    @staticmethod
-    def _generate_rule_by_id_params(args):
-        """
-        Generate query parameters for rule based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-        """
-        params = {}
-        valid_keys = ["fields"]
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f"argument {str(k)} is an invalid rule query parameter"
-                )
         return params
 
     @staticmethod
@@ -428,461 +401,6 @@ class VectraSaaSClient(object):
             if k in deprecated_keys:
                 param_deprecation(k)
         return params
-
-    # Start SaaS Methods
-    def get_all_detections(self, **kwargs):
-        """
-        Generator to retrieve all detections - all parameters are optional
-        :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
-        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param category: detection category - will be removed with deprecation of v1 of api
-        :param certainty: certainty score (int)
-        :param certainty_gte: certainty score greater than or equal to (int)
-        :param detection_type: detection type
-        :param detection_category: detection category
-        :param description:
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, url, detection_url, category, detection, detection_category,
-            detection_type, custom_detection, description, src_ip, state, t_score, c_score,
-            certainty, threat, first_timestamp, last_timestamp, targets_key_asset,
-            is_targeting_key_asset, src_account, src_host, note, note_modified_by,
-            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to,
-            assigned_date, groups, is_marked_custom, is_custom_model
-        :param host_id: detection id (int)
-        :param is_targeting_key_asset: detection is targeting key asset (bool)
-        :param is_triaged: detection is triaged
-        :param last_timestamp: timestamp of last activity on detection (datetime)
-        :param max_id: maximum ID of detection returned
-        :param min_id: minimum ID of detection returned
-        :param ordering: field used to sort response
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        :param src_ip: source ip address of host attributed to detection
-        :param state: state of detection (active/inactive)
-        :param t_score: threat score (int) - will be removed with deprecation of v1 of api
-        :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param tags: tags assigned to detection; this uses substring matching
-        :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
-        :param threat: threat score (int)
-        :param threat_gte threat score is greater than or equal to (int)
-        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
-        """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/detections",
-            params=self._generate_detection_params(kwargs),
-        )
-        yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
-
-    def get_detection_by_id(self, detection_id=None, **kwargs):
-        """
-        Get detection by id
-        :param detection_id: detection id - required
-        :param fields: comma separated string of fields to be filtered and returned - optional
-            possible values are: id, url, detection_url, category, detection, detection_category,
-            detection_type, custom_detection, description, src_ip, state, t_score, c_score,
-            certainty, threat, first_timestamp, last_timestamp, targets_key_asset,
-            is_targeting_key_asset, src_account, src_host, note, note_modified_by,
-            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to,
-            assigned_date, groups, is_marked_custom, is_custom_model
-        """
-
-        if not detection_id:
-            raise ValueError("Detection id required")
-
-        return self._request(
-            method="get",
-            url=f"{self.url}/detections/{detection_id}",
-            params=self._generate_detection_params(kwargs),
-        )
-
-    def mark_detections_fixed(self, detection_ids=None):
-        """
-        Mark detections as fixed
-        :param detection_ids: list of detections to mark as fixed
-        """
-        if not isinstance(detection_ids, list):
-            raise ValueError("Must provide a list of detection IDs to mark as fixed")
-        return self._toggle_detections_fixed(detection_ids, fixed=True)
-
-    def unmark_detections_fixed(self, detection_ids=None):
-        """
-        Unmark detections as fixed
-        :param detection_ids: list of detections to unmark as fixed
-        """
-        if not isinstance(detection_ids, list):
-            raise ValueError("Must provide a list of detection IDs to unmark as fixed")
-        return self._toggle_detections_fixed(detection_ids, fixed=False)
-
-    def _toggle_detections_fixed(self, detection_ids, fixed):
-        """
-        Internal function to mark/unmark detections as fixed
-        """
-        payload = {"detectionIdList": detection_ids, "mark_as_fixed": str(fixed)}
-
-        return self._request(method="patch", url=f"{self.url}/detections", json=payload)
-
-    def get_all_accounts(self, **kwargs):
-        """
-        Generator to retrieve all accounts - all parameters are optional
-        :param all: does nothing
-        :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
-        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param certainty: certainty score (int)
-        :param certainty_gte: certainty score greater than or equal to (int)
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are id, url, name, state, threat, certainty, severity, account_type,
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level,
-            privilege_category, last_detection_timestamp, detection_set, probable_home
-        :param first_seen: first seen timestamp of the account (datetime)
-        :param include_detection_summaries: include detection summary in response (bool)
-        :param last_seen: last seen timestamp of the account (datetime)
-        :param last_source: registered ip address of host
-        :param max_id: maximum ID of account returned
-        :param min_id: minimum ID of account returned
-        :param name: registered name of host
-        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
-        :param ordering: field to use to order response
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        :param privilege_category: privilege category of account (low/medium/high)
-        :param privilege_level: privilege level of account (0-10)
-        :param privilege_level_gte: privilege of account level greater than or equal to (int)
-        :param state: state of host (active/inactive)
-        :param t_score: threat score (int) - will be removed with deprecation of v1 of api
-        :param t_score_gte: threat score greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param tags: tags assigned to account
-        :param threat: threat score (int)
-        :param threat_gte: threat score greater than or equal to (int)
-        """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/accounts",
-            params=self._generate_account_params(kwargs),
-        )
-        yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
-
-    def get_account_by_id(self, account_id=None, **kwargs):
-        """
-        Get account by id
-        :param account_id: account id - required
-        :param fields: comma separated string of fields to be filtered and returned - optional
-            possible values are id, url, name, state, threat, certainty, severity, account_type,
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level,
-            privilege_category, last_detection_timestamp, detection_set, probable_home
-        """
-        if not account_id:
-            raise ValueError("Account id required")
-
-        return self._request(
-            method="get",
-            url=f"{self.url}/accounts/{account_id}",
-            params=self._generate_detection_params(kwargs),
-        )
-
-    def get_all_rules(self, **kwargs):
-        """
-        Generator to retrieve all rules page by page - all parameters are optional
-        :param contains:
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp
-            description, enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group,
-            id, identity, ip, ip_group, is_whitelist, last_timestamp, priority, remote1_dns,
-            remote1_dns_groups, remote1_ip, remote1_ip_groups, remote1_kerb_account,
-            remote1_kerb_service, remote1_port, remote1_proto, remote2_dns, remote2_dns_groups,
-            remote2_ip, remote2_ip_groups, remote2_port, remote2_proto, sensor_luid, smart_category,
-            template, total_detections, type_vname, url
-        :param include_templates: include rule templates, default is False
-        :param ordering: field used to sort response
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/rules",
-            params=self._generate_rule_params(kwargs),
-        )
-        yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
-
-    def get_rule_by_id(self, rule_id, **kwargs):
-        """
-        Get triage rules by id
-        :param rule_id: id of triage rule to retrieve
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp,
-            description, enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id,
-            identity, ip, ip_group, is_whitelist, last_timestamp, priority, remote1_dns,
-            remote1_dns_groups, remote1_ip, remote1_ip_groups, remote1_kerb_account,
-            remote1_kerb_service, remote1_port, remote1_proto, remote2_dns, remote2_dns_groups,
-            remote2_ip, remote2_ip_groups, remote2_port, remote2_proto, sensor_luid, smart_category,
-            template, total_detections, type_vname, url
-        """
-        if not rule_id:
-            raise ValueError("Rule id required")
-
-        return self._request(
-            method="get",
-            url=f"{self.url}/rules/{rule_id}",
-            params=self._generate_rule_by_id_params(kwargs),
-        )
-
-    def create_rule(
-        self,
-        detection_category=None,
-        detection_type=None,
-        triage_category=None,
-        source_conditions=None,
-        additional_conditions=None,
-        is_whitelist=False,
-        **kwargs,
-    ):
-        """
-        Create triage rule
-        :param detection_category: detection category to triage
-            possible values are: botnet activity, command & control, reconnaissance,
-            lateral movement, exfiltration
-        :param detection_type: detection type to triage
-        :param triage_category: name that will be used for triaged detection
-        :param source_conditions: JSON blobs to represent a tree-like conditional structure
-            operators for leaf nodes: ANY_OF or NONE_OF
-            operators for non-leaf nodes: AND or OR
-            possible value for conditions: ip, host, account, sensor
-            Here is an example of a payload:
-            "sourceConditions": {
-                "OR": [
-                {
-                    "AND": [
-                    {
-                        "ANY_OF": {
-                        "field": "ip",
-                        "values": [
-                            {
-                            "value": "10.45.91.184",
-                            "label": "10.45.91.184"
-                            }
-                        ],
-                        "groups": [],
-                        "label": "IP"
-                        }
-                    }
-                    ]
-                }
-                ]
-            }
-        :param additional_conditions: JSON blobs to represent a tree-like conditional structure
-            operators for leaf nodes: ANY_OF or NONE_OF
-            operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto,
-                remote1_port, remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups,
-                remote2_proto, remote2_port, remote2_dns, remote2_dns_groups, account, named_pipe,
-                uuid, identity, service, file_share, file_extensions, rdp_client_name,
-                rdp_client_token, keyboard_name
-            Here is an example of a payload:
-            "additionalConditions": {
-                "OR": [
-                {
-                    "AND": [
-                    {
-                        "ANY_OF": {
-                        "field": "remote1_ip",
-                        "values": [
-                            {
-                            "value": "10.1.52.71",
-                            "label": "10.1.52.71"
-                            }
-                        ],
-                        "groups": [],
-                        "label": "External Target IP"
-                        }
-                    }
-                    ]
-                }
-                ]
-            }
-        :param is_whitelist: set to True if rule is a whitelist, opposed to tracking detections without scores (boolean)
-        :param description: name of the triage rule - optional
-        :param priority: used to determine order of triage filters (int) - optional
-        :returns request object
-        """
-        if not all([detection_category, detection_type, triage_category]):
-            raise ValueError("Missing required parameter")
-
-        if detection_category.lower() not in [
-            "botnet activity",
-            "command & control",
-            "reconnaissance",
-            "lateral movement",
-            "exfiltration",
-        ]:
-            raise ValueError("detection_category not recognized")
-
-        payload = {
-            "detection_category": detection_category,
-            "detection": detection_type,
-            "triage_category": triage_category,
-            "is_whitelist": is_whitelist,
-            "source_conditions": source_conditions,
-            "additional_conditions": additional_conditions,
-        }
-
-        return self._request(method="post", url=f"{self.url}/rules", json=payload)
-
-    def update_rule(self, rule_id=None, **kwargs):
-        """
-        Update triage rule
-        :param rule_id: id of rule to update - required
-        :param triage_category: name that will be used for triaged detection
-        :param source_conditions: JSON blobs to represent a tree-like conditional structure
-            operators for leaf nodes: ANY_OF or NONE_OF
-            operators for non-leaf nodes: AND or OR
-            possible value for conditions: ip, host, account, sensor
-            Here is an example of a payload:
-            "sourceConditions": {
-                "OR": [
-                {
-                    "AND": [
-                    {
-                        "ANY_OF": {
-                        "field": "ip",
-                        "values": [
-                            {
-                            "value": "10.45.91.184",
-                            "label": "10.45.91.184"
-                            }
-                        ],
-                        "groups": [],
-                        "label": "IP"
-                        }
-                    }
-                    ]
-                }
-                ]
-            }
-            }
-        :param additional_conditions: JSON blobs to represent a tree-like conditional structure
-            operators for leaf nodes: ANY_OF or NONE_OF
-            operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto,
-                remote1_port, remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups,
-                remote2_proto, remote2_port, remote2_dns, remote2_dns_groups, account, named_pipe,
-                uuid, identity, service, file_share, file_extensions, rdp_client_name,
-                rdp_client_token, keyboard_name
-            Here is an example of a payload:
-            "additionalConditions": {
-                "OR": [
-                {
-                    "AND": [
-                    {
-                        "ANY_OF": {
-                        "field": "remote1_ip",
-                        "values": [
-                            {
-                            "value": "10.1.52.71",
-                            "label": "10.1.52.71"
-                            }
-                        ],
-                        "groups": [],
-                        "label": "External Target IP"
-                        }
-                    }
-                    ]
-                }
-                ]
-            }
-        :param is_whitelist: set to True if rule is a whitelist, opposed to tracking detections without scores (boolean)
-        :param description: name of the triage rule - optional
-        :param priority: used to determine order of triage filters (int) - optional
-        :param enabled: is the rule currently enables (boolean) - optional - Not yet implemented!
-        :returns request object
-        """
-
-        if rule_id:
-            rule = self.get_rule_by_id(rule_id=rule_id).json()
-        else:
-            raise ValueError("rule id must be provided")
-
-        valid_keys = [
-            "description",
-            "priority",
-            "enabled",
-            "triage_category",
-            "is_whitelist",
-            "source_conditions",
-            "additional_conditions",
-        ]
-
-        for k, v in kwargs.items():
-            if k in valid_keys:
-                rule[k] = v
-            else:
-                raise ValueError(f"invalid parameter provided: {str(k)}")
-
-        return self._request(method="put", url=f"{self.url}/rules/{rule_id}", json=rule)
-
-    def delete_rule(self, rule_id=None, detection_ids=None):
-        """
-        Delete triage rule
-        :param rule_id:
-        :param detection_ids: IDs of the detections that the triage rule will be removed from
-        detections
-        """
-        if not rule_id:
-            raise ValueError("Rule id required")
-
-        if detection_ids and not isinstance(detection_ids, list):
-            detection_ids = detection_ids.split(",")
-
-        params = {"detectionIdList": detection_ids}
-
-        return self._request(
-            method="delete", url=f"{self.url}/rules/{rule_id}", params=params
-        )
-
-    def get_detection_tags(self, detection_id=None):
-        """
-        Get detection tags
-        :param detection_id: detection ID. required
-        """
-        if not detection_id:
-            raise ValueError("Must provide detection_id.")
-        return self._request(
-            method="get", url=f"{self.url}/tagging/detection/{detection_id}"
-        )
-
-    def set_detection_tags(self, detection_id=None, tags=[], append=False):
-        """
-        Set  detection tags
-        :param detection_id: - required
-        :param tags: list of tags to add to detection
-        :param append: overwrites existing list if set to False, appends to existing tags if set to True
-        Set to empty list to clear all tags (default: False)
-        """
-        if not detection_id:
-            raise ValueError("Must provide detection_id.")
-        if append and isinstance(tags, list):
-            current_list = self.get_detection_tags(detection_id=detection_id).json()[
-                "tags"
-            ]
-            payload = {"tags": current_list + tags}
-        elif isinstance(tags, list):
-            payload = {"tags": tags}
-        else:
-            raise TypeError("tags must be of type list")
-
-        return self._request(
-            method="patch",
-            url=f"{self.url}/tagging/detection/{detection_id}",
-            json=payload,
-        )
 
     def get_detection_notes(self, detection_id=None):
         """
@@ -1350,7 +868,7 @@ class VectraSaaSClient(object):
 
 class VectraSaaSClientV3_1(VectraSaaSClient):
     def __init__(
-        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+        self, url=None, client_id=None, secret_key=None, verify=False
     ):
         """
         Initialize Vectra Saas client
@@ -1363,7 +881,6 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
             url=url,
             client_id=client_id,
             secret_key=secret_key,
-            rux_tokens=rux_tokens,
             verify=verify,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
@@ -1497,7 +1014,7 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
 
 class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
     def __init__(
-        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+        self, url=None, client_id=None, secret_key=None, verify=False
     ):
         """
         Initialize Vectra Saas client
@@ -1510,7 +1027,6 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
             url=url,
             client_id=client_id,
             secret_key=secret_key,
-            rux_tokens=rux_tokens,
             verify=verify,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
@@ -1698,7 +1214,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
 
 class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
     def __init__(
-        self, url=None, client_id=None, secret_key=None, rux_tokens={}, verify=False
+        self, url=None, client_id=None, secret_key=None, verify=False
     ):
         """
         Initialize Vectra Saas client
@@ -1712,7 +1228,6 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
             client_id=client_id,
             secret_key=secret_key,
             verify=verify,
-            rux_tokens=rux_tokens,
         )
         url = VectraSaaSClient._remove_trailing_slashes(url)
         self.base_url = url
