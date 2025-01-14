@@ -702,25 +702,6 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
                     detections[detection["id"]] = VectraDetection(detection)
         return detections
 
-        """
-        host = self.get_host_by_id(host_id=host_id, fields="detection_set").json()
-        for detection in host.get("detection_set", []):
-            detection_ids.add(detection.rsplit("/", 1)[1])
-        # Get individual detections
-        detections = {}
-        for detection_id in detection_ids:
-            r = self.get_detection_by_id(detection_id=detection_id)
-            detection = r.json()
-            # Ignore info detections, custom and inactive ones
-            if (
-                detection.get("category") != "INFO"
-                and detection.get("state") == "active"
-                and detection.get("is_triaged") is False
-            ):
-                detections[detection["id"]] = VectraDetection(detection)
-        return detections
-        """
-
     def get_detections_on_account(self, account_id: int) -> DetectionDict:
         """
         Get a dictionary of all detections on a given account, matching by id.
