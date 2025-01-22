@@ -32,7 +32,7 @@ setuptools==69.2.0
 six==1.16.0
 stix==1.2.0.11
 urllib3==2.2.1
-vectra-api-tools==2.4.1
+vectra-api-tools>=2.4.1
 wcwidth==0.2.13
 weakrefmethod==1.0.3
 wheel==0.43.0
