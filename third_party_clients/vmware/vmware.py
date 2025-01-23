@@ -48,7 +48,7 @@ class Client(ThirdPartyInterface):
 
     def block_host(self, host):
         # We use a mix of instance and BIOS UUID
-        uuid = host.vmware_vm_uuid[:36]
+        uuid = host.vmware_vm_uuid[37:]
         # As we don't know the VCSA the host is on, we need to loop
         vm_pointer = None
         for vcsa_host, si in self.vcsa_hosts_service_instances.items():
@@ -65,7 +65,10 @@ class Client(ThirdPartyInterface):
             if vm_pointer:
                 self.update_virtual_nic_state(si, vm_pointer, "disconnect")
                 break  # break the parent loop as well
-        return [uuid]
+        if vm_pointer:
+            return [uuid]
+        else:
+            return[]
 
     def groom_host(self, host) -> dict:
         self.logger.warning("VMWare client does not implement host grooming")
@@ -73,7 +76,7 @@ class Client(ThirdPartyInterface):
 
     def unblock_host(self, host):
         # We use a mix of instance and BIOS UUID. We can use the UUID we have on the host container, not the tag as this in constant.
-        uuid = host.vmware_vm_uuid[:36]
+        uuid = host.vmware_vm_uuid[37:]
         # As we don't know the VCSA the host is on, we need to loop
         vm_pointer = None
         for vcsa_host, si in self.vcsa_hosts_service_instances.items():

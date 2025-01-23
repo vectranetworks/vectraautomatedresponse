@@ -148,7 +148,7 @@ class Client(ThirdPartyInterface):
         self.internal_block_policy_name = INTERNAL_ADDRESS_GROUP
         self.external_block_policy_name = EXTERNAL_ADDRESS_GROUP
         if len(IP) == len(PORT) == len(VDOM) == len(VERIFY):
-            firewalls = zip(IP, PORT, VDOM)
+            firewalls = zip(IP, PORT, VDOM, VERIFY)
         else:
             self.logger.error(
                 f"Missing inputs for firewall configuration. Check fortinet_config.py \
@@ -165,7 +165,7 @@ class Client(ThirdPartyInterface):
                         ipaddr=firewall[0],
                         port=firewall[1],
                         token=_get_password(
-                            "Fortinet", firewall[0], modify=kwargs["modify"]
+                            "Fortinet API Token", firewall[0], modify=kwargs["modify"]
                         ),
                         vdom=firewall[2],
                         verify=firewall[3],

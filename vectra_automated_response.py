@@ -85,9 +85,8 @@ class TypeException(TypeError):
         logger.error(f"{imported_list} is not of {val}.")
 
 
-URL_REGEX = r"^http[s]?://\d{12}.(uw2|ew1|cc1|as2).portal.vectra.ai.*$"
 clients = {}
-for client in os.listdir("third_party_clients"):
+for client in os.listdir(f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients"):
     if client not in [
         "__init__.py",
         "__pycache__",
@@ -97,8 +96,8 @@ for client in os.listdir("third_party_clients"):
     ]:
         tpc = [
             x
-            for x in os.listdir(f"third_party_clients/{client}")
-            if not re.search(r"_config|__|READ|\.[D|t]", x)
+            for x in os.listdir(f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}")
+            if not re.search(r"_config|__|READ|\.[D|t]", x) and x.endswith('.py')
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -128,17 +127,7 @@ HostDict = Dict[str, VectraHost]
 AccountDict = Dict[str, VectraAccount]
 DetectionDict = Dict[str, VectraDetection]
 
-
-def get_rux_tokens():
-    rux_tokens = keyring.get_password(url, "rux_tokens")
-    if rux_tokens:
-        rux_tokens = json.loads(rux_tokens)
-        if rux_tokens.get("_accessTime") > round(time.time()):
-            return rux_tokens
-        else:
-            print("Tokens expired!")
-    return {}
-
+    
 
 def log_conf(debug):
     if LOG_TO_FILE:
@@ -209,9 +198,8 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :param secret_key: V3 API Secret Key for authentication - required
         :param verify: verify SSL - optional
         """
-        if re.match(URL_REGEX, url, re.IGNORECASE):
-            rux_tokens = get_rux_tokens()
-            super().__init__(url, client_id, secret_key, rux_tokens, verify)
+        if V3:
+            super().__init__(url, client_id, secret_key, verify)
         else:
             super().__init__(url, token, verify)
         self.logger = logging.getLogger("VectraClient")
@@ -703,22 +691,15 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: DetectionDict
         """
         # Get all detection IDs on hosts
-        detection_ids = set()
-        host = self.get_host_by_id(host_id=host_id, fields="detection_set").json()
-        for detection in host.get("detection_set", []):
-            detection_ids.add(detection.rsplit("/", 1)[1])
-        # Get individual detections
         detections = {}
-        for detection_id in detection_ids:
-            r = self.get_detection_by_id(detection_id=detection_id)
-            detection = r.json()
-            # Ignore info detections, custom and inactive ones
-            if (
+        r  = self.get_all_detections(host_id=host_id, is_triaged=False)
+        for page in r:
+            for detection in page.json()['results']:
+                if (
                 detection.get("category") != "INFO"
                 and detection.get("state") == "active"
-                and detection.get("is_triaged") is False
-            ):
-                detections[detection["id"]] = VectraDetection(detection)
+                ):
+                    detections[detection["id"]] = VectraDetection(detection)
         return detections
 
     def get_detections_on_account(self, account_id: int) -> DetectionDict:
@@ -1357,7 +1338,6 @@ class VectraAutomatedResponse(object):
                         self.info_msg.append(message)
                         # Remove all tags set by this script from the host.
                         if "block" in tags:
-                            print(host.keys())
                             message = 'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
                                 host["name"]
                             )
@@ -1807,21 +1787,6 @@ def main(args, vectra_api_client, third_party_clients):
             hosts_to_groom,
         ) = var.get_hosts_to_block_unblock(groom=args.groom)
 
-        # Store tokens for RUX
-        if vectra_api_client.version >= 3.0:
-            keyring.set_password(
-                vectra_api_client.base_url,
-                "rux_tokens",
-                json.dumps(
-                    {
-                        "_access": vectra_api_client._access,
-                        "_refresh": vectra_api_client._refresh,
-                        "_accessTime": vectra_api_client._accessTime,
-                        "_refreshTime": vectra_api_client._refreshTime,
-                    }
-                ),
-            )
-
         if not alert:
             var.block_hosts(hosts_to_block)
             var.unblock_hosts(hosts_to_unblock)
@@ -2033,7 +1998,7 @@ if __name__ == "__main__":
     vectra_api_clients = []
     for url in COGNITO_URL:
         logger.debug(f"Configuring Vectra API Client for {url}")
-        if re.match(URL_REGEX, url, re.IGNORECASE):
+        if V3:
             vectra_api_clients.append(
                 VectraClient(
                     url=url,
@@ -2045,7 +2010,7 @@ if __name__ == "__main__":
             vectra_api_clients.append(
                 VectraClient(
                     url,
-                    _get_password(url, "Token", modify=modify),
+                    _get_password(url, "APIv2 Token", modify=modify),
                 )
             )
 
