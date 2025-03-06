@@ -7,4 +7,4 @@ IP = [""]
 PORT = [443]
 # TOKEN = "youneedanapitoken"
 VDOM = ["root"]
-VERIFY = [False]
+CHECK_SSL = [False]

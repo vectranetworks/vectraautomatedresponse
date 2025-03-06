@@ -11,23 +11,32 @@ from third_party_clients.third_party_interface import (
 )
 from third_party_clients.trendmicro_visionone.vision_one_config import (
     BASE_URL,
-    VERIFY,
+    CHECK_SSL,
 )
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = " VisionOne Client"
-        self.logger = logging.getLogger()
+        self.module = "trendmicro_visionone"
+        self.init_log(kwargs)
         self.url = BASE_URL + "/v3.0/"
-        self.verify = VERIFY
-        self.api_key = _get_password("VisionOne", "API_Key", modify=kwargs["modify"])
+        self.verify = CHECK_SSL
+        self.api_key = _get_password(
+            "VisionOne", "API_Key", modify=kwargs["modify"]
+        )  # API key should have role of Senior Analyst or higher.
         self.headers = {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + self.api_key,
         }
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _search_computer(self, host: VectraHost) -> list:
         """

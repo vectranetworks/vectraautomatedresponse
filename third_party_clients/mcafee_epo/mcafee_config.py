@@ -1,3 +1,3 @@
-MCAFEE_URL = ""
-MCAFEE_PORT = ""
-MCAFEE_TAGID = ""
+HOSTNAME = ""
+PORT = ""
+TAGID = ""

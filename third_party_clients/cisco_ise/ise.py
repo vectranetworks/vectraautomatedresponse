@@ -6,6 +6,7 @@ import time
 
 import requests
 import xmltodict
+from common import _get_password
 from third_party_clients.cisco_ise.ise_config import (
     CHECK_SSL,
     ENHANCED,
@@ -20,8 +21,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
-from common import _get_password
 
 SUCCESS_CODES = [200, 201, 202, 203, 204]
 
@@ -45,7 +44,7 @@ def fetch_csrf(func):
                 return func(self, *args, **kwargs)
             except KeyError:
                 if "X-CSRF-Token" not in result.headers:
-                    self.logger.warn(
+                    self.logger.warning(
                         "CSRF Token not returned. Ensure CSRF is configured for the ISE API."
                     )
                     sys.exit()
@@ -70,7 +69,6 @@ def _format_url(url):
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
-        self.name = "ISE Client"
         """
         Initialize Cisco ISE client
         :param url: FQDN or IP of ISE appliance - required
@@ -78,7 +76,9 @@ class Client(ThirdPartyInterface):
         :param password: Password to authenticate to ISE - required
         :param verify: Verify SSL (default: False) - optional
         """
-        self.logger = logging.getLogger("ISE")
+        self.name = "ISE Client"
+        self.module = "cisco_ise"
+        self.init_log(kwargs)
         self.url = f"{_format_url(ISE_APPLIANCE_IP)}"
         self.auth = (
             _get_password("Cisco_ISE", "Username", modify=kwargs["modify"]),
@@ -98,7 +98,13 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         blocked_macs = []
         mac_addresses = set(host.mac_addresses)
         # Check if the current MAC is already known
@@ -115,7 +121,7 @@ class Client(ThirdPartyInterface):
                 blocked_macs.append(mac)
         return blocked_macs
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         unblocked_macs = []
         mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
@@ -124,28 +130,28 @@ class Client(ThirdPartyInterface):
                 unblocked_macs.append(mac)
         return unblocked_macs
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("ISE client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("ISE client does not implement detection-based blocking")
+        self.logger.warning("ISE client does not implement detection-based blocking")
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("ISE client does not implement detection-based blocking")
+        self.logger.warning("ISE client does not implement detection-based blocking")
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ISE client does not implement account-based blocking")
+        self.logger.warning("ISE client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ISE client does not implement account-based blocking")
+        self.logger.warning("ISE client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
@@ -211,7 +217,7 @@ class Client(ThirdPartyInterface):
         if response.status_code in SUCCESS_CODES:
             return mac_address
         elif response.status_code == 403 and ENHANCED is False:
-            self.logger.warn(
+            self.logger.warning(
                 "{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(
                     msg=response.content.decode().split("<")[0]
                 )
@@ -219,7 +225,7 @@ class Client(ThirdPartyInterface):
         elif response.json()["ERSResponse"]["messages"][0]["title"] == "Radius Failure":
             return mac_address
         else:
-            self.logger.warn(
+            self.logger.warning(
                 f'Unable to unblock {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}'
             )
 
@@ -257,7 +263,7 @@ class Client(ThirdPartyInterface):
         if response.status_code in SUCCESS_CODES:
             return mac_address
         elif response.status_code == 403 and ENHANCED is False:
-            self.logger.warn(
+            self.logger.warning(
                 "{msg}. ISE is CSRF enabled but script is not. Validate ise_config.py.".format(
                     msg=response.content.decode().split("<")[0]
                 )
@@ -265,7 +271,7 @@ class Client(ThirdPartyInterface):
         elif response.json()["ERSResponse"]["messages"][0]["title"] == "Radius Failure":
             return mac_address
         else:
-            self.logger.warn(
+            self.logger.warning(
                 f'Unable to block {mac_address}: {response.json()["ERSResponse"]["messages"][0]["title"]}'
             )
 

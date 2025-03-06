@@ -4,6 +4,7 @@ import logging
 
 import requests
 from cachetools import TTLCache, cached
+from common import _get_password
 from third_party_clients.bitdefender.bitdefender_config import (
     BLOCK_MULTIPLE,
     CHECK_SSL,
@@ -17,13 +18,12 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
-from common import _get_password
-
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "Bitdefender Client"
-        self.logger = logging.getLogger()
+        self.module = "bitdefender"
+        self.init_log(kwargs)
         self.apiKey = _get_password("Bitdefender", "API_Key", modify=kwargs["modify"])
         self.url = "https://" + HOSTNAME + "/api/v1.0/jsonrpc"
         self.verify = CHECK_SSL
@@ -38,6 +38,12 @@ class Client(ThirdPartyInterface):
         self.company_id = self._get_company_id()
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _get_company_id(self):
         body = {
@@ -54,114 +60,130 @@ class Client(ThirdPartyInterface):
         )
         return res.json()["result"]["id"]
 
-    def block_host(self, host):
+    def block_host(self, host: VectraHost):
         endpoint_ids = self._get_endpoint_id(host)
         if len(endpoint_ids) > 1 and self.block_multiple:
             for endpoint in endpoint_ids:
                 if endpoint:
-                    self.logger.info("Quarantining endpoint:{}".format(endpoint))
+                    self.logger.debug("Isolating endpoint:{}".format(endpoint))
                     result = self._isolate_endpoint(endpoint)
                     if not result:
                         self.logger.info(
-                            "Unable to Quarantine endpoint:{}".format(endpoint)
+                            "Unable to isolate endpoint:{}".format(endpoint)
                         )
                     elif "error" in result.keys():
-                        self.logger.info(
-                            "Unable to quarantined endpoint:{} with response:{}".format(
+                        self.logger.error(
+                            "Unable to isolate endpoint:{} with response:{}".format(
                                 endpoint, result
                             )
                         )
                     else:
                         self.logger.debug(
-                            "Quarantined endpoint:{} with response:{}".format(
+                            "Isolated endpoint:{} with response:{}".format(
                                 endpoint, result
                             )
                         )
         elif len(endpoint_ids) == 1:
-            self.logger.info("Quarantining endpoint:{}".format(endpoint_ids[0]))
+            self.logger.debug("Isolating endpoint:{}".format(endpoint_ids[0]))
             result = self._isolate_endpoint(endpoint_ids[0])
             if not result:
                 self.logger.info(
-                    "Unable to Quarantine endpoint:{}".format(endpoint_ids[0])
+                    "Unable to isolate endpoint:{}".format(endpoint_ids[0])
                 )
             elif "error" in result.keys():
-                self.logger.debug(
-                    "Unable to quarantined endpoint:{} with response:{}".format(
+                self.logger.error(
+                    "Unable to isolate endpoint:{} with response:{}".format(
                         endpoint_ids, result
                     )
                 )
             else:
                 self.logger.debug(
-                    "Quarantined endpoint:{} with response:{}".format(
+                    "Isolated endpoint:{} with response:{}".format(
                         endpoint_ids[0], result
                     )
                 )
         else:
-            self.logger.info(
+            self.logger.debug(
                 "Not configured to block multiple endpoints or no endpoint found for host{}. {}".format(
                     host.name, endpoint_ids
                 )
             )
         return endpoint_ids
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         endpoint_ids = host.blocked_elements.get(self.name, [])
         for endpoint_id in endpoint_ids:
             if endpoint_id:
-                self.logger.info(
-                    "Unquarantining endpoint:{},{}".format(host.name, endpoint_id)
+                self.logger.debug(
+                    "Unisolating endpoint:{},{}".format(host.name, endpoint_id)
                 )
                 result = self._restore_endpoint(endpoint_id)
                 if not result:
                     self.logger.info(
-                        "Unable to unquarantine endpoint:{},{}".format(
+                        "Unable to unisolate endpoint:{},{}".format(
                             host.name, endpoint_id
                         )
                     )
                 elif "error" in result.keys():
-                    self.logger.info(
-                        "Unable to unquarantined endpoint:{} with response:{}".format(
+                    self.logger.error(
+                        "Unable to unisolated endpoint:{} with response:{}".format(
                             endpoint_id, result
                         )
                     )
             else:
-                self.logger.info(
+                self.logger.debug(
                     "No proper endpoint id supplied:{}".format(endpoint_ids)
                 )
         return endpoint_ids
 
     def groom_host(self, host) -> dict:
+        # this client only implements Host-based blocking
         self.logger.warning("Bitdefender client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn(
+        self.logger.warning(
             "Bitdefender client does not implement detection-based blocking"
         )
         return []
 
-    def unblock_detection(self, detection):
-        # this client only implements Host-basd blocking
+    def unblock_detection(self, detection: VectraDetection):
+        # this client only implements Host-based blocking
+        self.logger.warning(
+            "Bitdefender client does not implement detection-based blocking"
+        )
         return []
 
     def block_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-basd blocking
+        # this client only implements Host-based blocking
+        self.logger.warning(
+            "Bitdefender client does not implement account-based blocking"
+        )
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-basd blocking
+        # this client only implements Host-based blocking
+        self.logger.warning(
+            "Bitdefender client does not implement account-based blocking"
+        )
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-basd blocking
+        # this client only implements Host-based blocking
+        self.logger.warning(
+            "Bitdefender client does not implement block_static_dst_ips-based blocking"
+        )
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-basd blocking
+        # this client only implements Host-based blocking
+        self.logger.warning(
+            "Bitdefender client does not implement block_static_dst_ips-based blocking"
+        )
         return []
 
-    def _get_endpoint_id(self, host):
+    def _get_endpoint_id(self, host: VectraHost):
         endpoint_ids = []
         # Try getEndpointsList
         # https://www.bitdefender.com/business/support/en/77209-128483-getendpointslist.html

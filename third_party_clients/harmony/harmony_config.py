@@ -1,3 +1,2 @@
-HOSTNAME = ""
+AUTH_URL = ""
 CHECK_SSL = False
-BLOCK_MULTIPLE = False

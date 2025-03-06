@@ -5,6 +5,8 @@ import string
 from datetime import datetime
 
 import requests
+from common import _get_password
+
 from third_party_clients.pan_cortex.cortex_config import (
     CORTEX_API_TYPE,
     CORTEX_URL,
@@ -16,8 +18,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
-from common import _get_password
 
 
 def request_error_handler(func):
@@ -37,7 +37,8 @@ def request_error_handler(func):
 
 
 class HTTPException(Exception):
-    pass
+    def __init__(self, status_code, content):
+        super().__init__(status_code, content)
 
 
 class Client(ThirdPartyInterface):
@@ -59,26 +60,95 @@ class Client(ThirdPartyInterface):
         return url_param[:-1]
 
     def __init__(self, **kwargs):
-        self.name = "Cortex Client"
         """
         Initialize PAN Cortex client
-        :param cortex_url: FQDN or IP of Cortex appliance - required
-        :param cortex_api_token:  - required
-        :param cortex_key_id: - required
-        :param verify: Verify SSL (default: False) - optional
         """
-        self.logger = logging.getLogger()
-        self.cortex_url = CORTEX_URL
+        self.name = "Cortex Client"
+        self.module = "cortex"
+        self.init_log(**kwargs)
+        if CORTEX_URL:
+            self.cortex_url = CORTEX_URL
+        else:
+            raise ValueError("Missing Cortex EDR URL")
         self.cortex_api_token = _get_password(
             "Cortex", "API_Token", modify=kwargs["modify"]
         )
         self.cortex_key_id = _get_password("Cortex", "Key_ID", modify=kwargs["modify"])
-        self.headers = ""
-
+        self.headers = None
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def get_headers(self):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost) -> list:
+        try:
+            endpoint_id = self._get_endpoint_id(host.ip)
+            if endpoint_id:
+                self._quarantaine_endpoint(endpoint_id)
+                return [endpoint_id]
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    content=f"No online Cortex XDR Agent found for IP {host.ip}",
+                )
+        except HTTPException as e:
+            self.logger.error(f"Lookup for ip {host.ip} in Cortex EDR failed - {e}")
+            return []
+
+    def unblock_host(self, host: VectraHost) -> list:
+        # Get all Endpoint IDs blocked by this client
+        blocked_elements = host.blocked_elements[self.name]
+        unblocked_elements = []
+        for endpoint_id in blocked_elements:
+            try:
+                self._unquarantaine_endpoint(endpoint_id)
+                unblocked_elements.append(endpoint_id)
+            except HTTPException as e:
+                self.logger.error(
+                    f"Unable to unblock endpoint ID {endpoint_id}: {e} - Continuing"
+                )
+                continue
+        return unblocked_elements
+
+    def groom_host(self, host: VectraHost) -> dict:
+        self.logger.warning("Cortex client does not implement host grooming")
+        return []
+
+    def block_detection(self, detection: VectraDetection) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement detection-based blocking")
+        return []
+
+    def unblock_detection(self, detection: VectraDetection) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement detection-based blocking")
+        return []
+
+    def block_account(self, account: VectraAccount) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement account-based blocking")
+        return []
+
+    def unblock_account(self, account: VectraAccount) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement account-based blocking")
+        return []
+
+    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement static IP blocking")
+        return []
+
+    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("Cortex client does not implement static IP blocking")
+        return []
+
+    def _get_headers(self) -> None:
         if CORTEX_API_TYPE == "standard":
             self.headers = {
                 "x-xdr-auth-id": self.cortex_key_id,
@@ -109,88 +179,58 @@ class Client(ThirdPartyInterface):
                 "Authorization": api_key_hash,
             }
 
-    def block_host(self, host):
-        endpoint_id, isolation_status = self.get_endpoint_id(host["ip"])
-        if isolation_status == "AGENT_UNISOLATED":
-            self._quarantaine_endpoint(endpoint_id)
-        return host["ip"]
-
-    def unblock_host(self, host):
-        endpoint_id, isolation_status = self.get_endpoint_id(host["ip"])
-        if isolation_status == "AGENT_ISOLATED":
-            self._unquarantaine_endpoint(endpoint_id)
-        return host["ip"]
-
-    def groom_host(self, host) -> dict:
-        self.logger.warning("Cortex client does not implement host grooming")
-        return []
-
-    def block_detection(self, detection):
-        # this client only implements Host-based blocking
-        self.logger.warn("Cortex client does not implement detection-based blocking")
-        return []
-
-    def unblock_detection(self, detection):
-        # this client only implements Host-based blocking
-        return []
-
-    def block_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def unblock_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        return []
-
     @request_error_handler
-    def _request(self, method, suffix, payload):
-        return requests(
-            method=method,
-            url=self.cortex_url + suffix,
-            headers=self.headers,
-            json=payload,
-            verify=False,
-        )
+    def _request(self, method: str, url: str, **kwargs) -> requests.request:
 
-    def _quarantaine_endpoint(self, endpoint_id):
+        if method not in ["get", "patch", "put", "post", "delete"]:
+            raise ValueError("Invalid requests method provided")
+
+        if not self.headers:
+            self._get_headers()
+
+        return requests.request(method=method, url=url, headers=self.headers, **kwargs)
+
+    def _quarantaine_endpoint(self, endpoint_id: str) -> requests.request:
         """
         Put an endpoint in the Quarantaine policy based on its MAC address
         :param mac_address: MAC address of the endpoint to quarantaine - required
         :rtype: None
         """
         # We need first to put the endpoint in a temporary policy to make the port bounce
-        suffix = "/public_api/v1/endpoints/isolate/"
+        url = f"{self.cortex_url}/public_api/v1/endpoints/isolate/"
         payload = {"request_data": {"endpoint_id": endpoint_id}}
-        self._request(
+        return self._request(
             method="post",
-            suffix=suffix,
+            url=url,
             json=payload,
         )
 
-    def _unquarantaine_endpoint(self, endpoint_id):
+    def _unquarantaine_endpoint(self, endpoint_id: str) -> requests.request:
         """
         Remove an endpoint from the Quarantaine policy based on its MAC address
         :param mac_address: MAC address of the endpoint to unquarantaine - required
         :rtype: Requests.Response
         """
-        suffix = "/public_api/v1/endpoints/unisolate/"
-        payload = {"request_data": {"endpoint_id": endpoint_id}}
-        self._request(
+        url = f"{self.cortex_url}/public_api/v1/endpoints/unisolate/"
+        payload = {
+            "request_data": {
+                "filters": [
+                    {
+                        "field": "endpoint_id_list",
+                        "operator": "in",
+                        "value": [endpoint_id],
+                    }
+                ]
+            }
+        }
+        return self._request(
             method="post",
-            suffix=suffix,
+            url=url,
             json=payload,
         )
 
-    def get_endpoint_id(self, ip_address):
-        suffix = "/public_api/v1/endpoints/get_endpoint/"
+    def _get_endpoint_id(self, ip_address: str):
+        url = f"{self.cortex_url}/public_api/v1/endpoints/get_endpoint/"
         payload = {
             "request_data": {
                 "search_from": 0,
@@ -204,15 +244,13 @@ class Client(ThirdPartyInterface):
 
         r = self._request(
             method="post",
-            url=self.cortex_url + suffix,
-            headers=self.headers,
+            url=url,
             json=payload,
-            verify=False,
         )
         response = r.json()["reply"]
-        try:
-            endpoint_id = response["endpoints"][0]["endpoint_id"]
-            isolation_status = response["endpoints"][0]["is_isolated"]
-            return endpoint_id, isolation_status
-        except IndexError:
-            return False
+        for endpoint in response["endpoints"]:
+            # We assume the endpoint is online if it was detected, and this avoids the issue of pending actions (see README)
+            if endpoint["endpoint_status"] == "CONNECTED":
+                if endpoint["is_isolated"] == "AGENT_UNISOLATED":
+                    return endpoint["endpoint_id"]
+        return None

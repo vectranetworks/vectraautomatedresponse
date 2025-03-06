@@ -2,11 +2,8 @@ import json
 import logging
 
 import requests
-from requests.auth import HTTPBasicAuth
-from third_party_clients.cisco_fmc.fmc_config import (
-    URL,
-)
-
+from common import _get_password
+from third_party_clients.cisco_fmc.fmc_config import BLOCK_GROUP, URL
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -16,25 +13,30 @@ from third_party_clients.third_party_interface import (
 )
 from urllib3.exceptions import InsecureRequestWarning
 
-from common import _get_password
-
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "FMC Client"
-        self.logger = logging.getLogger()
-        self._check_connection()
-        self.group_id = _get_password("Cisco_FMC", "Group_ID", modify=kwargs["modify"])
+        self.module = "cisco_fmc"
+        self.init_log(kwargs)
         self.auth = (
             _get_password("Cisco_FMC", "Username", modify=kwargs["modify"]),
             _get_password("Cisco_FMC", "Password", modify=kwargs["modify"]),
         )
+        self._check_connection()
+        self.group_id = self._get_group_id_by_objcet_name(BLOCK_GROUP)
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host) -> list[str]:
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost) -> list[str]:
         self.logger.info(f"Processing block request for host with IP {host.ip}")
         try:
             if host_fmc_id := self._get_host_id_by_object_name(host.ip):
@@ -67,7 +69,7 @@ class Client(ThirdPartyInterface):
             self.logger.error(f"Skipping IP {host.ip}.")
             return []
 
-    def unblock_host(self, host) -> list[str]:
+    def unblock_host(self, host: VectraHost) -> list[str]:
         host_fmc_id = host.blocked_elements.get(self.name, [])[0]
         self.logger.info(
             f"Processing unblock request for IP: {host.ip} / ID: {host_fmc_id}"
@@ -88,45 +90,57 @@ class Client(ThirdPartyInterface):
             self.logger.error(f"Skipping IP {host.ip}.")
             return []
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("Cisco FMC client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement detection-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement detection-based blocking"
+        )
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement detection-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement detection-based blocking"
+        )
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement account-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement account-based blocking"
+        )
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement account-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement account-based blocking"
+        )
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement static IP-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement static IP-based blocking"
+        )
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("Cisco FMC client does not implement static IP-based blocking")
+        self.logger.warning(
+            "Cisco FMC client does not implement static IP-based blocking"
+        )
         return []
 
     def _check_connection(self):
         try:
-            self.logger.info("Performing Cisco FTP connection check.")
+            self.logger.debug("Performing Cisco FTP connection check.")
             self._authenticate()
-            self.logger.info("Connection check successful.")
+            self.logger.debug("Connection check successful.")
         except requests.HTTPError as e:
             self.logger.error(
                 "Connection check failed. Please check credentials in config file and see detailed error below."
@@ -145,16 +159,15 @@ class Client(ThirdPartyInterface):
                 f"Authentication failed - Status: {response.status_code} - Response: {response.text}",
                 response=response,
             )
-        accesstoken = response.headers["X-auth-access-token"]
-        domain_uuid = response.headers["DOMAIN_UUID"]
-        return accesstoken, domain_uuid
+        self.accesstoken = response.headers["X-auth-access-token"]
+        self.domain_uuid = response.headers["DOMAIN_UUID"]
 
     def _create_host(self, name, desciption, ip):
-        accesstoken, domain_uuid = self._authenticate()
-        host_endpoint = f"api/fmc_config/v1/domain/{domain_uuid}/object/hosts"
+        # accesstoken, domain_uuid = self._authenticate()
+        host_endpoint = f"api/fmc_config/v1/domain/{self.domain_uuid}/object/hosts"
         headers = {
             "Content-Type": "application/json",
-            "X-auth-access-token": accesstoken,
+            "X-auth-access-token": self.accesstoken,
         }
         host_payload = json.dumps(
             {
@@ -178,10 +191,10 @@ class Client(ThirdPartyInterface):
         return response.json()["id"]
 
     def _delete_host(self, id):
-        accesstoken, domain_uuid = self._authenticate()
-        host_endpoint = f"api/fmc_config/v1/domain/{domain_uuid}/object/hosts/{id}"
+        # accesstoken, domain_uuid = self._authenticate()
+        host_endpoint = f"api/fmc_config/v1/domain/{self.domain_uuid}/object/hosts/{id}"
         headers = {
-            "X-auth-access-token": accesstoken,
+            "X-auth-access-token": self.accesstoken,
         }
         response = requests.delete(
             URL + host_endpoint,
@@ -195,10 +208,10 @@ class Client(ThirdPartyInterface):
             )
 
     def _get_all_hosts(self):
-        accesstoken, domain_uuid = self._authenticate()
-        host_endpoint = f"api/fmc_config/v1/domain/{domain_uuid}/object/hosts"
+        # accesstoken, domain_uuid = self._authenticate()
+        host_endpoint = f"api/fmc_config/v1/domain/{self.domain_uuid}/object/hosts"
         headers = {
-            "X-auth-access-token": accesstoken,
+            "X-auth-access-token": self.accesstoken,
         }
         response = requests.get(
             URL + host_endpoint,
@@ -229,9 +242,9 @@ class Client(ThirdPartyInterface):
         return data
 
     def _get_host(self, id):
-        accesstoken, domain_uuid = self._authenticate()
-        host_endpoint = f"api/fmc_config/v1/domain/{domain_uuid}/object/hosts/{id}"
-        headers = {"X-auth-access-token": accesstoken}
+        # accesstoken, domain_uuid = self._authenticate()
+        host_endpoint = f"api/fmc_config/v1/domain/{self.domain_uuid}/object/hosts/{id}"
+        headers = {"X-auth-access-token": self.accesstoken}
         response = requests.get(
             URL + host_endpoint,
             headers=headers,
@@ -252,10 +265,12 @@ class Client(ThirdPartyInterface):
         return None
 
     def _get_all_groups(self):
-        accesstoken, domain_uuid = self._authenticate()
-        group_endpoint = f"api/fmc_config/v1/domain/{domain_uuid}/object/networkgroups"
+        # accesstoken, domain_uuid = self._authenticate()
+        group_endpoint = (
+            f"api/fmc_config/v1/domain/{self.domain_uuid}/object/networkgroups"
+        )
         headers = {
-            "X-auth-access-token": accesstoken,
+            "X-auth-access-token": self.accesstoken,
         }
         response = requests.get(
             URL + group_endpoint,
@@ -286,11 +301,11 @@ class Client(ThirdPartyInterface):
         return data
 
     def _get_group(self, id):
-        accesstoken, domain_uuid = self._authenticate()
+        # accesstoken, domain_uuid = self._authenticate()
         group_endpoint = (
-            f"api/fmc_config/v1/domain/{domain_uuid}/object/networkgroups/{id}"
+            f"api/fmc_config/v1/domain/{self.domain_uuid}/object/networkgroups/{id}"
         )
-        headers = {"X-auth-access-token": accesstoken}
+        headers = {"X-auth-access-token": self.accesstoken}
         response = requests.get(
             URL + group_endpoint,
             headers=headers,
@@ -304,13 +319,13 @@ class Client(ThirdPartyInterface):
         return response.json()
 
     def _update_group(self, id, new_group_definition):
-        accesstoken, domain_uuid = self._authenticate()
+        # accesstoken, domain_uuid = self._authenticate()
         group_endpoint = (
-            f"api/fmc_config/v1/domain/{domain_uuid}/object/networkgroups/{id}"
+            f"api/fmc_config/v1/domain/{self.domain_uuid}/object/networkgroups/{id}"
         )
         headers = {
             "Content-Type": "application/json",
-            "X-auth-access-token": accesstoken,
+            "X-auth-access-token": self.accesstoken,
         }
         group_payload = json.dumps(new_group_definition)
         response = requests.put(
@@ -319,13 +334,14 @@ class Client(ThirdPartyInterface):
             data=group_payload,
             verify=False,
         )
-        if not response.status_code in [200, 201, 202]:
+        if response.status_code not in [200, 201, 202]:
             raise requests.HTTPError(
                 f"Failed to update group with id {id} - Status: {response.status_code} - Response: {response.text}",
                 response=response,
             )
 
     def _get_group_id_by_objcet_name(self, group_name):
+        self.logger.debug(f"Obtaining group_id for group {group_name}")
         groups = self._get_all_groups()
         for group in groups:
             if group["name"] == group_name:
@@ -333,6 +349,7 @@ class Client(ThirdPartyInterface):
         return None
 
     def _add_host_to_group(self, host_id, group_id):
+        self.logger.debug(f"Adding host_id {host_id} to group_id {group_id}")
         group = self._get_group(group_id)
         host = self._get_host(host_id)
         group["objects"].append(
@@ -345,6 +362,7 @@ class Client(ThirdPartyInterface):
         self._update_group(group_id, group)
 
     def _remove_host_from_group(self, host_id, group_id):
+        self.logger.debug(f"Removing host_id {host_id} to group_id {group_id}")
         group = self._get_group(group_id)
         for obj in group["objects"]:
             if obj["id"] == host_id:

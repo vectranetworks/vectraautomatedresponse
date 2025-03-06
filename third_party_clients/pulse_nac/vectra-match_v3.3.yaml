@@ -1,0 +1,2432 @@
+openapi: 3.0.2
+info:
+  version: 1.1.0
+  title: RUX Vectra Match
+  contact:
+    name: Vectra TME (Olivier)
+    email: tme@vectra.ai
+  description: Vectra RUX Match API
+  license:
+    name: TME Custom °-.-°
+    url: https://vectra.ai
+servers:
+  - url: https://{tenant-id}.{region}.portal.vectra.ai/api/{apiVersion}
+    description: Vectra SaaS API (Prod)
+    variables:
+      tenant-id:
+        description: The FQDN or IP to join the Vectra SaaS tenant
+        default: vectra-dummy
+      region:
+        description: The SaaS region
+        enum:
+          - uw2
+          - cc1
+          - eu1
+        default: uw2
+      apiVersion:
+        description: The API version to use
+        enum:
+          - v3.3
+        default: v3.3
+security:
+  - VectraOauth: []
+tags:
+  - name: Match Enablement
+    description: .
+  - name: Match Available Devices
+    description: .
+  - name: Match Rules
+    description: .
+  - name: Match Assignments
+    description: .
+  - name: Match Status
+    description: .
+  - name: Match Stats
+    description: .
+  - name: Match Alert Stats
+    description: .
+paths:
+  /vectra-match/enablement:
+    description: Allows to manage enablement of the Vectra Match feature on devices.
+    get:
+      operationId: matchEnablementGet
+      summary: Get current enablement state for a given device.
+      description: Get current enablement state for a given device (sensor or mixed brain).
+      tags:
+        - Match Enablement
+      parameters:
+        - $ref: '#/components/parameters/deviceSerialMandatory'
+      responses:
+        '200':
+          description: Enablement state successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/enablementSingleResult'
+              examples:
+                Match_enabled:
+                  $ref: '#/components/examples/enablementEnabled'
+                Match_disabled:
+                  $ref: '#/components/examples/enablementDisabled'
+        '400':
+          description: Bad request parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ruxError'
+              examples:
+                device-serial_invalid:
+                  $ref: '#/components/examples/invalidDeviceSerial'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/deviceNotConnected'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+    post:
+      operationId: matchEnablementSet
+      summary: Set enablement state for a given device.
+      description: |
+        Toggle Vectra Match ON or OFF on a given device.  
+        A valid Vectra Match license would be needed to enable the feature (not needed to disable it).
+
+        The device needs to reboot when their enablement state changed.
+        This means that when a device is enabled (changes state from disabled to enabled) or disabled (changes state from enabled to disabled),
+        as a normal part of configuration, the device must reboot.
+
+        Please keep in mind the following:
+        - During the reboot, no traffic will be processed by the device that you are changing the state on.
+          - This means that metadata will not be passed for further processing (Detect for Network, Advanced Investigation, Stream, etc).
+        - Device reboot generally take from 1 to 10 minutes depending on the model.
+          - Virtual (including cloud) devices are normally the fastest.
+          - Hardware devices take a bit more time to boot.
+      tags:
+        - Match Enablement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/enablementRequestBody'
+            examples:
+              Enable:
+                value:
+                  device_serial: xxxxx
+                  desired_state: true
+              Disable:
+                value:
+                  device_serial: xxxxx
+                  desired_state: false
+      responses:
+        '200':
+          description: Enablement state successfully set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/enablementSingleResult'
+              examples:
+                Match_enabled:
+                  $ref: '#/components/examples/enablementEnabled'
+                Match_disabled:
+                  $ref: '#/components/examples/enablementDisabled'
+        '400':
+          description: Bad request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ruxError'
+                examples:
+                  device-serial_invalid:
+                    $ref: examples.yaml#/invalidDeviceSerial
+                  desired_state_invalid:
+                    summary: Invalid desired state
+                    value:
+                      details: desired_state not provided or is not a boolean
+                  inputs_invalid:
+                    summary: Invalid inputs
+                    value:
+                      details: Failed to toggle Vectra Match due to invalid inputs
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          description: |
+            Cannot perform this operation.  
+            The **not licensed** error is only possible when attempting to enable the feature.
+
+            Disabling the feature does not require a valid Vectra Match license.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ruxError'
+              examples:
+                Unauthorized:
+                  $ref: '#/components/examples/unauthorized'
+                Not-licensed:
+                  $ref: '#/components/examples/errorNotLicensed'
+        '404':
+          $ref: '#/components/responses/deviceNotConnected'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/stats:
+    description: Allows to retrieve stats for devices.
+    get:
+      operationId: matchStatsGet
+      summary: Allows to retrieve stats for a given or all devices.
+      description: |
+        Providing a device serial will return all information for that serial.  
+        If a device serial is not provided, information for all devices who have ever been enabled will be returned.
+      tags:
+        - Match Stats
+      parameters:
+        - $ref: '#/components/parameters/deviceSerial'
+      responses:
+        '200':
+          description: Stats successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statsResults'
+              examples:
+                No-device:
+                  $ref: '#/components/examples/statsNoDevice'
+                One-device_no-data:
+                  $ref: '#/components/examples/statsNoDataInCacheOneDevice'
+                Three-devices_no-data:
+                  $ref: '#/components/examples/statsNoDataInCacheThreeDevices'
+                One-device:
+                  $ref: '#/components/examples/statsOneDevice'
+        '400':
+          $ref: '#/components/responses/invalidSerial'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/deviceNotConnected'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/status:
+    description: Allows to retrieve status for devices.
+    get:
+      operationId: matchStatusGet
+      summary: Get current status for a given or all devices.
+      description: |
+        Providing a device serial will return all information for that serial.  
+        If a device serial is not provided, information for all devices who have ever been enabled will be returned.
+      tags:
+        - Match Status
+      parameters:
+        - $ref: '#/components/parameters/deviceSerial'
+      responses:
+        '200':
+          description: Status successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statusResults'
+              examples:
+                No-device:
+                  $ref: '#/components/examples/statusNoDevice'
+                One-device_no-data:
+                  $ref: '#/components/examples/statusNoDataInCacheOneDevice'
+                Three-devices_no-data:
+                  $ref: '#/components/examples/statusNoDataInCacheThreeDevices'
+                One-device:
+                  $ref: '#/components/examples/statusOneDevice'
+                Three-devices:
+                  $ref: '#/components/examples/statusThreeDevices'
+                Unhealthy-devices:
+                  $ref: '#/components/examples/statusUnhealthyDevices'
+        '400':
+          $ref: '#/components/responses/invalidSerial'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/deviceNotConnected'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/available-devices:
+    description: Allows to list all available Match devices.
+    get:
+      operationId: matchAvailableDevicesGet
+      summary: Shows all currently available devices (includes the mixed mode appliance if one is in use).
+      tags:
+        - Match Available Devices
+      responses:
+        '200':
+          description: Available devices successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/availableDevicesResults'
+              examples:
+                No-device:
+                  $ref: '#/components/examples/availableDevicesNoDevice'
+                Mixed-mode-appliance-only:
+                  $ref: '#/components/examples/availableDevicesMixedModeOnly'
+                Sensors-and-mixed-mode-appliance:
+                  $ref: '#/components/examples/availableDevicesSensorsAndMixedMode'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/rules:
+    description: Allows to retrieve information about rulesets.
+    get:
+      operationId: matchRulesetGet
+      summary: Get information about a single ruleset.
+      tags:
+        - Match Rules
+      parameters:
+        - $ref: '#/components/parameters/rulesetUUID'
+      responses:
+        '200':
+          description: Ruleset details successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rulesResult'
+              examples:
+                Single-rule_no-device:
+                  $ref: '#/components/examples/rulesSingleRuleNoDevice'
+        '400':
+          $ref: '#/components/responses/notProvidedOrInvalidUUID'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/unknownRulesetUUID'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+    delete:
+      operationId: matchRulesetDelete
+      summary: Delete an existing ruleset.
+      description: |
+        Delete an existing ruleset.  
+        All existing associations/assignments between that ruleset and any devices it is assigned to will also be deleted.
+      tags:
+        - Match Rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ruleDeleteRequestBody'
+      responses:
+        '200':
+          description: Ruleset successfully deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  details:
+                    type: string
+                required:
+                  - details
+              examples:
+                Success:
+                  $ref: '#/components/examples/rulesSuccessDeletion'
+        '400':
+          $ref: '#/components/responses/invalidUUID'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/unknownRulesetUUID'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/rules/upload:
+    description: |
+      Allows to manage rulesets upload.  
+      The process for performing a rules upload is:
+      - Start a new rules file upload
+      - Use the upload URL from step 1 to upload the file data
+      - Mark the upload as completed
+      - Confirm the file has synced successfully to the appliance
+      - On successful sync to the appliance, the file will appear in the rules_to_devices_map list of Vectra Match rules
+      - Assign the new ruleset
+    get:
+      operationId: matchRulesetUploadsGet
+      summary: Get information about ruleset uploads.
+      tags:
+        - Match Rules
+      parameters:
+        - $ref: '#/components/parameters/rulesetUploadUUID'
+      responses:
+        '200':
+          description: Uploaded ruleset files details.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/rulesetUploadResultItem'
+                  - $ref: '#/components/schemas/rulesetUploadResults'
+              examples:
+                Pending-upload:
+                  $ref: '#/components/examples/rulesetUploadPending'
+                Completed-upload:
+                  $ref: '#/components/examples/rulesetUploadCompleted'
+                List:
+                  $ref: '#/components/examples/rulesetUploadList'
+        '400':
+          $ref: '#/components/responses/notProvidedOrInvalidUUID'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/unknownRulesetUploadUUID'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+    post:
+      operationId: matchRulesetUploadStart
+      summary: Start the upload of a new rules file.
+      description: |
+        Up to 25 rules files can be uploaded to be used by Vectra Match.  
+        Each rules file size must be lower than 200MB.  
+        A valid Vectra Match license would be needed to upload a rules file.
+      tags:
+        - Match Rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rulesetUploadStartRequestBody'
+            examples:
+              Start-upload-without-notes:
+                $ref: '#/components/examples/rulesetUploadStartRequestBodyWithoutNotes'
+              Start-upload-with-notes:
+                $ref: '#/components/examples/rulesetUploadStartRequestBodyWithNotes'
+      responses:
+        '200':
+          description: Ruleset upload successfully started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rulesetUploadStartResult'
+              example:
+                id: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+                urls:
+                  - https://temporary-upload-url-valid-for-2-min
+          links:
+            TemporaryUploadUrl:
+              description: This temporary URL will be used to upload the real rules file.
+              operationId: matchRulesetUploadExternal
+              server:
+                url: $response.body#/urls/0
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+  /vectra-match/rules/upload/{rulesetUploadUUID}:
+    description: |
+      Allows to manage rulesets upload.  
+      The process for performing a rules upload is:
+      - Start a new rules file upload
+      - Use the upload URL from step 1 to upload the file data
+      - Mark the upload as completed
+      - Confirm the file has synced successfully to the appliance
+      - On successful sync to the appliance, the file will appear in the rules_to_devices_map list of Vectra Match rules
+      - Assign the new ruleset
+    patch:
+      operationId: matchRulesetUploadUpdate
+      summary: Update the state of the ruleset upload.
+      tags:
+        - Match Rules
+      parameters:
+        - $ref: '#/components/parameters/rulesetUploadPathUUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/rulesUploadUpdateResult'
+            examples:
+              Completed-upload:
+                $ref: '#/components/examples/rulesetUploadUpdateRequestBodyCompleted'
+              Aborted-upload:
+                $ref: '#/components/examples/rulesetUploadUpdateRequestBodyAborted'
+      responses:
+        '200':
+          description: Ruleset upload successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rulesUploadUpdateResult'
+              examples:
+                Completed-upload:
+                  $ref: '#/components/examples/rulesetUploadUpdateCompleted'
+                Aborted-upload:
+                  $ref: '#/components/examples/rulesetUploadUpdateAborted'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+  /vectra-match/assignment:
+    description: This endpoint is used to manage the mapping between rulesets and devices.
+    get:
+      operationId: matchAssignmentsGet
+      summary: Retrieve all existing mappings between rulesets and devices
+      tags:
+        - Match Assignments
+      responses:
+        '200':
+          description: Assignments successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/assignmentsResults'
+              examples:
+                No-rules-file:
+                  $ref: '#/components/examples/assignmentsNoRulesFile'
+                One-rules_three-devices:
+                  $ref: '#/components/examples/assignmentsOneRuleThreeDevices'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+    post:
+      operationId: matchAssignmentUpdate
+      summary: Add a rules file assignment to various devices
+      tags:
+        - Match Assignments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/assignmentsUpdateRequestBody'
+            examples:
+              One-to-one:
+                $ref: '#/components/examples/assignmentsUpdateRequestQueryOneToOne'
+              One-to-many:
+                $ref: '#/components/examples/assignmentsUpdateRequestQueryOneToMany'
+      responses:
+        '200':
+          description: Assignment successfully updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  details:
+                    type: string
+                required:
+                  - details
+              examples:
+                Success:
+                  $ref: '#/components/examples/assignmentsSuccessUpdate'
+        '400':
+          description: Bad request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+                examples:
+                  device-serials_invalid:
+                    summary: Invalid device serials
+                    value:
+                      details: device_serials not provided or is not a list
+                  uuid_invalid:
+                    $ref: examples.yaml#/invalidUuid
+                  inputs_invalid:
+                    summary: Invalid inputs
+                    value:
+                      details: Failed to assign Vectra Match ruleset due to one or more invalid inputs
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unlicensedOrUnauthorized'
+        '404':
+          $ref: '#/components/responses/uuidOrSerialDoesNotExist'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+    delete:
+      operationId: matchAssignmentDelete
+      summary: Delete a rules file assignment to one unique devices
+      tags:
+        - Match Assignments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/assignmentsDeleteRequestBody'
+            examples:
+              Delete:
+                $ref: '#/components/examples/assignmentsDeleteRequestQuery'
+      responses:
+        '200':
+          description: Assignment successfully delete.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  details:
+                    type: string
+                required:
+                  - details
+              examples:
+                Success:
+                  $ref: '#/components/examples/assignmentsSuccessDelete'
+        '400':
+          description: Bad request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+                examples:
+                  device-serial_invalid:
+                    $ref: examples.yaml#/invalidDeviceSerial
+                  uuid_invalid:
+                    $ref: examples.yaml#/invalidUuid
+                  inputs_invalid:
+                    summary: Invalid inputs
+                    value:
+                      details: Failed to delete Vectra Match rule assignment due to one or more invalid inputs
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/uuidOrSerialDoesNotExist'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/alert-stats:
+    description: Allows to retrieve stats for alert.
+    get:
+      operationId: matchAlertStatsGet
+      summary: Allows to retrieve stats about alerts.
+      description: |
+        Providing a device serial will return all information for that serial.  
+        If a device serial is not provided, information for all devices who have ever been enabled will be returned.
+
+        _top_alert_counts_ attribute returns the **top 10** counts since the last eve log rotation
+      tags:
+        - Match Alert Stats
+      parameters:
+        - $ref: '#/components/parameters/deviceSerial'
+      responses:
+        '200':
+          description: Alert stats successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/alertStatsResults'
+              examples:
+                No-device:
+                  $ref: '#/components/examples/alertStatsNoDevice'
+                One-device_no-data:
+                  $ref: '#/components/examples/alertStatsNoDataOneDevice'
+                One-device:
+                  $ref: '#/components/examples/alertStatsOneDevice'
+                Three-devices:
+                  $ref: '#/components/examples/alertStatsThreeDevices'
+        '400':
+          $ref: '#/components/responses/invalidSerial'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/deviceNotConnected'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+  /vectra-match/download-vectra-ruleset:
+    description: Allows to download the Vectra Curated Ruleset.
+    get:
+      operationId: matchDownloadVectraCuratedRuleset
+      summary: Download the Vectra Curated Ruleset.
+      tags:
+        - Match Rules
+      responses:
+        '200':
+          description: Vectra curated ruleset successfully retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/curatedRulesetDownloadLink'
+              example:
+                download_url: https://xxx.s3.amazonaws.com/yyy?zzz
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/curatedRulesetFileNotFound'
+        '500':
+          $ref: '#/components/responses/curatedRulesetUnexpectedError'
+  /:
+    servers:
+      - url: https://temporary-upload-url
+        description: |
+          This server URL comes from the `/vectra-match/rules/upload` POST action result.
+          It is valid during 2 minutes, meaning you have 2 minutes to start upload a ruleset file.
+    put:
+      operationId: matchRulesetUploadExternal
+      summary: Upload the file to the temporary url.
+      tags:
+        - Match Rules
+      responses:
+        '200':
+          description: File successfully uploaded
+        '403':
+          $ref: '#/components/responses/rulesetUploadAccessExpired'
+components:
+  securitySchemes:
+    VectraOauth:
+      type: oauth2
+      description: Vectra SaaS OAUTH scheme
+      flows:
+        clientCredentials:
+          tokenUrl: /oauth2/token
+          refreshUrl: /oauth2/token
+          scopes: {}
+  schemas:
+    deviceSerial:
+      type: string
+    enablementSingleResult:
+      type: object
+      properties:
+        is_enabled:
+          type: boolean
+      required:
+        - is_enabled
+    ruxError:
+      type: object
+      properties:
+        details:
+          description: A human readable error message
+          type: string
+      required:
+        - details
+    enablementRequestBody:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        desired_state:
+          type: boolean
+      required:
+        - device_serial
+        - desired_state
+    eveStats:
+      type: object
+    nullValue:
+      type: string
+      nullable: true
+      enum:
+        - null
+    positiveInt:
+      type: integer
+      format: int32
+      minimum: 0
+    forwarderStats:
+      type: object
+      properties:
+        alerts_dropped_for_rate_limit:
+          $ref: '#/components/schemas/positiveInt'
+        alerts_dropped_for_rate_limit_this_hour:
+          $ref: '#/components/schemas/positiveInt'
+        events_processed:
+          $ref: '#/components/schemas/positiveInt'
+        events_sent:
+          $ref: '#/components/schemas/positiveInt'
+      required:
+        - alerts_dropped_for_rate_limit
+        - alerts_dropped_for_rate_limit_this_hour
+        - events_processed
+        - events_sent
+    ftStats:
+      type: object
+      properties:
+        bytes_received:
+          $ref: '#/components/schemas/positiveInt'
+        memif_bytes_dropped:
+          $ref: '#/components/schemas/positiveInt'
+        memif_bytes_sent:
+          $ref: '#/components/schemas/positiveInt'
+        memif_packets_dropped:
+          $ref: '#/components/schemas/positiveInt'
+        memif_packets_sent:
+          $ref: '#/components/schemas/positiveInt'
+        packets_received:
+          $ref: '#/components/schemas/positiveInt'
+      required:
+        - bytes_received
+        - memif_bytes_dropped
+        - memif_bytes_sent
+        - memif_packets_dropped
+        - memif_packets_sent
+        - packets_received
+    interfaceStats:
+      type: object
+      properties:
+        interfaces:
+          type: array
+          items:
+            type: object
+            properties:
+              byte_dropped:
+                $ref: '#/components/schemas/positiveInt'
+              byte_received:
+                $ref: '#/components/schemas/positiveInt'
+              byte_received_perf:
+                $ref: '#/components/schemas/positiveInt'
+              ierrors:
+                $ref: '#/components/schemas/positiveInt'
+              imissed:
+                $ref: '#/components/schemas/positiveInt'
+              ipackets:
+                $ref: '#/components/schemas/positiveInt'
+              mbuf_9k_alloc_failed:
+                $ref: '#/components/schemas/positiveInt'
+              mbuf_9k_alloc_ok:
+                $ref: '#/components/schemas/positiveInt'
+              mbuf_9k_populate_failed:
+                $ref: '#/components/schemas/positiveInt'
+              name:
+                type: string
+              no_packet:
+                $ref: '#/components/schemas/positiveInt'
+              packet_dropped:
+                $ref: '#/components/schemas/positiveInt'
+              packet_received:
+                $ref: '#/components/schemas/positiveInt'
+              packet_received_perf:
+                $ref: '#/components/schemas/positiveInt'
+              rx_loop:
+                $ref: '#/components/schemas/positiveInt'
+              rx_nombuf:
+                $ref: '#/components/schemas/positiveInt'
+              speed:
+                $ref: '#/components/schemas/positiveInt'
+              status:
+                type: string
+                enum:
+                  - down
+                  - up
+              tx_attempt:
+                $ref: '#/components/schemas/positiveInt'
+              tx_loop:
+                $ref: '#/components/schemas/positiveInt'
+              tx_packet_dropped:
+                $ref: '#/components/schemas/positiveInt'
+              type:
+                type: string
+            required:
+              - byte_dropped
+              - byte_received
+              - byte_received_perf
+              - ierrors
+              - imissed
+              - ipackets
+              - mbuf_9k_alloc_failed
+              - mbuf_9k_alloc_ok
+              - mbuf_9k_populate_failed
+              - name
+              - no_packet
+              - packet_dropped
+              - packet_received
+              - packet_received_perf
+              - rx_loop
+              - rx_nombuf
+              - speed
+              - status
+              - tx_attempt
+              - tx_loop
+              - tx_packet_dropped
+              - type
+      required:
+        - interfaces
+    isoDateMicroseconds:
+      description: ISO representation of a date with microseconds
+      type: string
+      format: date-time
+      example: '2022-01-01T00:00:00.123456+00:00'
+    statsEntry:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        eve_stats:
+          oneOf:
+            - $ref: '#/components/schemas/eveStats'
+            - $ref: '#/components/schemas/nullValue'
+        forwarder_stats:
+          oneOf:
+            - $ref: '#/components/schemas/forwarderStats'
+            - $ref: '#/components/schemas/nullValue'
+        ft_stats:
+          oneOf:
+            - $ref: '#/components/schemas/ftStats'
+            - $ref: '#/components/schemas/nullValue'
+        interface_stats:
+          oneOf:
+            - $ref: '#/components/schemas/interfaceStats'
+            - $ref: '#/components/schemas/nullValue'
+        timestamp:
+          oneOf:
+            - $ref: '#/components/schemas/isoDateMicroseconds'
+            - $ref: '#/components/schemas/nullValue'
+      required:
+        - device_serial
+        - eve_stats
+        - forwarder_stats
+        - ft_stats
+        - interface_stats
+        - timestamp
+    statsResults:
+      type: object
+      properties:
+        stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/statsEntry'
+      required:
+        - stats
+    processHealth:
+      type: string
+      nullable: true
+      enum:
+        - null
+        - healthy
+        - unhealthy
+        - disabled
+        - activating
+        - deactivating
+    processErrorDetail:
+      description: Provide an explanation regarding what has failed if process_health value equals unhealthy
+      type: string
+      nullable: true
+      enum:
+        - null
+        - ''
+        - Vectra Match service unhealthy on device
+        - Excessive packet drops in Vectra Match
+        - Excessive alerts rate limited in Vectra Match
+        - Flow configuration is invalid on device
+    statusEntry:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        is_enabled:
+          type: boolean
+        process_health:
+          $ref: '#/components/schemas/processHealth'
+        process_error_detail:
+          $ref: '#/components/schemas/processErrorDetail'
+        timestamp:
+          oneOf:
+            - $ref: '#/components/schemas/isoDateMicroseconds'
+            - $ref: '#/components/schemas/nullValue'
+      required:
+        - device_serial
+        - is_enabled
+        - process_health
+        - timestamp
+    statusResults:
+      type: object
+      properties:
+        status:
+          type: array
+          items:
+            $ref: '#/components/schemas/statusEntry'
+      required:
+        - status
+    IP:
+      description: IP Address
+      type: string
+      example: 192.168.1.55
+    isoDate:
+      description: ISO representation of a date
+      type: string
+      format: date-time
+      example: '2022-01-01T00:00:00Z'
+    nullableString:
+      type: string
+      nullable: true
+    deviceMode:
+      type: string
+      enum:
+        - mixed
+        - sensor
+    productName:
+      type: string
+      enum:
+        - X29
+        - X29v2
+        - S11
+        - S101
+        - vSensor
+    productVersion:
+      type: string
+    availableDevicesEntry:
+      type: object
+      properties:
+        alias:
+          type: string
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        headend_uri:
+          type: string
+        ip_address:
+          $ref: '#/components/schemas/IP'
+        is_virtual:
+          type: boolean
+        last_seen:
+          $ref: '#/components/schemas/isoDate'
+        location:
+          $ref: '#/components/schemas/nullableString'
+        mode:
+          $ref: '#/components/schemas/deviceMode'
+        product_name:
+          $ref: '#/components/schemas/productName'
+        version:
+          $ref: '#/components/schemas/productVersion'
+      required:
+        - device_serial
+        - ip_address
+        - is_virtual
+        - mode
+        - product_name
+        - version
+    availableDevicesResults:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/availableDevicesEntry'
+      required:
+        - devices
+    UUID:
+      type: string
+      format: uuid
+      pattern: ^[a-z0-9]{8}(?:-[a-z0-9]{4}){3}-[a-z0-9]{12}$
+      example: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+    ruleHashsum:
+      type: string
+    rulesResult:
+      type: object
+      properties:
+        device_serials:
+          type: array
+          items:
+            $ref: '#/components/schemas/deviceSerial'
+        hashsum:
+          $ref: '#/components/schemas/ruleHashsum'
+        name:
+          type: string
+        notes:
+          type: string
+        timestamp:
+          $ref: '#/components/schemas/isoDateMicroseconds'
+        uuid:
+          $ref: '#/components/schemas/UUID'
+    ruleDeleteRequestBody:
+      type: object
+      properties:
+        uuid:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - uuid
+    rulesetUploadUUID:
+      type: string
+      format: uuid
+      pattern: ^[a-z0-9]{8}(?:-[a-z0-9]{4}){3}-[a-z0-9]{12}$
+      example: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+    rulesetUploadStatus:
+      type: string
+      enum:
+        - completed
+        - aborted
+        - pending
+    rulesetExternalTaskStatus:
+      type: string
+      enum:
+        - in_progress
+        - not_started
+        - success
+        - failed
+    rulesetExternalTaskUpdatedAt:
+      anyOf:
+        - $ref: '#/components/schemas/isoDate'
+        - $ref: '#/components/schemas/nullableString'
+    rulesetExternalTaskError:
+      type: string
+      pattern: ^Uploaded Vectra Match ruleset failed validation, errors:.+$
+      nullable: true
+    rulesetExternalTaskErrorCode:
+      type: integer
+      minimum: 6001
+      maximum: 6005
+      nullable: true
+    rulesetUploadResultItem:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        file_name:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        upload_status:
+          $ref: '#/components/schemas/rulesetUploadStatus'
+        external_task_status:
+          $ref: '#/components/schemas/rulesetExternalTaskStatus'
+        external_task_updated_at:
+          $ref: '#/components/schemas/rulesetExternalTaskUpdatedAt'
+        external_task_error:
+          $ref: '#/components/schemas/rulesetExternalTaskError'
+        external_task_error_code:
+          $ref: '#/components/schemas/rulesetExternalTaskErrorCode'
+      required:
+        - id
+        - file_name
+        - notes
+        - upload_status
+        - external_task_status
+        - external_task_updated_at
+        - external_task_error
+        - external_task_error_code
+    rulesetUploadResults:
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/rulesetUploadResultItem'
+        count:
+          $ref: '#/components/schemas/positiveInt'
+      required:
+        - results
+        - count
+    rulesetUploadStartRequestBody:
+      type: object
+      properties:
+        file_name:
+          type: string
+        notes:
+          type: string
+      required:
+        - file_name
+    rulesetUploadStartResult:
+      properties:
+        id:
+          $ref: '#/components/schemas/rulesetUploadUUID'
+        urls:
+          type: array
+          items:
+            type: string
+    rulesUploadUpdateResult:
+      type: object
+      properties:
+        upload_status:
+          type: string
+          enum:
+            - completed
+            - aborted
+      required:
+        - upload_status
+    assignmentsDeviceToRulesMapEntry:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        timestamp:
+          $ref: '#/components/schemas/isoDateMicroseconds'
+        updated_by:
+          type: string
+      required:
+        - device_serial
+        - rules
+        - timestamp
+        - updated_by
+    assignmentsResults:
+      type: object
+      properties:
+        device_to_rules_map:
+          type: array
+          items:
+            $ref: '#/components/schemas/assignmentsDeviceToRulesMapEntry'
+        rules_to_devices_map:
+          type: array
+          items:
+            $ref: '#/components/schemas/rulesResult'
+      required:
+        - device_to_rules_map
+        - rules_to_devices_map
+    assignmentsUpdateRequestBody:
+      type: object
+      properties:
+        device_serials:
+          type: array
+          items:
+            $ref: '#/components/schemas/deviceSerial'
+          minItems: 1
+        uuid:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - uuid
+        - device_serials
+    error:
+      type: object
+      properties:
+        detail:
+          description: A human readable error message
+          type: string
+        details:
+          description: A human readable error message
+          type: string
+    assignmentsDeleteRequestBody:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        uuid:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - uuid
+        - device_serial
+    ID:
+      description: ID
+      type: integer
+      format: int32
+      minimum: 1
+    alertStatsEntry:
+      type: object
+      properties:
+        count:
+          $ref: '#/components/schemas/positiveInt'
+        signature:
+          type: string
+        signature_id:
+          $ref: '#/components/schemas/ID'
+      required:
+        - count
+        - signature
+        - signature_id
+    alertStatsDeviceEntry:
+      type: object
+      properties:
+        device_serial:
+          $ref: '#/components/schemas/deviceSerial'
+        eve_log_rotated_time:
+          oneOf:
+            - $ref: '#/components/schemas/isoDate'
+            - $ref: '#/components/schemas/nullValue'
+        top_alert_counts:
+          oneOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/alertStatsEntry'
+            - $ref: '#/components/schemas/nullValue'
+      required:
+        - device_serial
+        - eve_log_rotated_time
+        - top_alert_counts
+    alertStatsResults:
+      type: object
+      properties:
+        alert_stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/alertStatsDeviceEntry'
+      required:
+        - alert_stats
+    curatedRulesetDownloadLink:
+      type: object
+      properties:
+        download_url:
+          type: string
+          format: uri
+      required:
+        - download_url
+  parameters:
+    deviceSerialMandatory:
+      name: device_serial
+      description: The serial number of the device we're looking into
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/deviceSerial'
+    deviceSerial:
+      name: device_serial
+      description: The serial number of the device we're looking into
+      in: query
+      schema:
+        $ref: '#/components/schemas/deviceSerial'
+    rulesetUUID:
+      name: uuid
+      description: The rules file UUID
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/UUID'
+    rulesetUploadUUID:
+      name: uuid
+      description: The ruleset upload UUID
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/rulesetUploadUUID'
+    rulesetUploadPathUUID:
+      name: rulesetUploadUUID
+      description: The ruleset upload UUID
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/rulesetUploadUUID'
+  examples:
+    enablementEnabled:
+      summary: Vectra Match is enabled
+      value:
+        is_enabled: true
+    enablementDisabled:
+      summary: Vectra Match is disabled
+      value:
+        is_enabled: false
+    invalidDeviceSerial:
+      summary: Invalid device serial
+      value:
+        details: device_serial not provided or is not a string
+    unauthorized:
+      summary: Invalid permission
+      value:
+        details: You do not have permission to perform this action.
+    errorNotLicensed:
+      summary: Not licensed
+      value:
+        details: You are not licensed to use Vectra Match, please contact support to enable this feature
+    statsNoDevice:
+      summary: No device
+      value:
+        stats: []
+    statsNoDataInCacheOneDevice:
+      summary: One device with no data
+      value:
+        stats:
+          - device_serial: U12312300000123
+            eve_stats: null
+            forwarder_stats: null
+            ft_stats: null
+            interface_stats: null
+            timestamp: null
+    statsNoDataInCacheThreeDevices:
+      summary: Three devices with no data
+      value:
+        stats:
+          - device_serial: U12312300000123
+            eve_stats: null
+            forwarder_stats: null
+            ft_stats: null
+            interface_stats: null
+            timestamp: null
+          - device_serial: U12312300000456
+            eve_stats: null
+            forwarder_stats: null
+            ft_stats: null
+            interface_stats: null
+            timestamp: null
+          - device_serial: U12312300000789
+            eve_stats: null
+            forwarder_stats: null
+            ft_stats: null
+            interface_stats: null
+            timestamp: null
+    statsOneDevice:
+      summary: One device
+      value:
+        stats:
+          - eve_stats:
+              timestamp: '2023-02-01T01:05:45.123456+00:00'
+              event_type: stats
+              stats:
+                uptime: 177
+                capture:
+                  packets: 1361
+                  rx_errors: 0
+                  tx_errors: 0
+                  dpdk:
+                    imissed: 0
+                    no_mbufs: 0
+                    ierrors: 0
+                decoder:
+                  pkts: 1361
+                  bytes: 2335792
+                  invalid: 0
+                  ipv4: 0
+                  ipv6: 0
+                  ethernet: 1361
+                  chdlc: 0
+                  raw: 0
+                  'null': 0
+                  sll: 0
+                  tcp: 0
+                  udp: 0
+                  sctp: 0
+                  esp: 0
+                  icmpv4: 0
+                  icmpv6: 0
+                  ppp: 0
+                  pppoe: 0
+                  geneve: 0
+                  gre: 0
+                  vlan: 0
+                  vlan_qinq: 0
+                  vxlan: 0
+                  vntag: 0
+                  ieee8021ah: 0
+                  teredo: 0
+                  ipv4_in_ipv6: 0
+                  ipv6_in_ipv6: 0
+                  mpls: 0
+                  avg_pkt_size: 1716
+                  max_pkt_size: 2048
+                  max_mac_addrs_src: 0
+                  max_mac_addrs_dst: 0
+                  erspan: 0
+                  nsh: 0
+                  event:
+                    ipv4:
+                      pkt_too_small: 0
+                      hlen_too_small: 0
+                      iplen_smaller_than_hlen: 0
+                      trunc_pkt: 0
+                      opt_invalid: 0
+                      opt_invalid_len: 0
+                      opt_malformed: 0
+                      opt_pad_required: 0
+                      opt_eol_required: 0
+                      opt_duplicate: 0
+                      opt_unknown: 0
+                      wrong_ip_version: 0
+                      icmpv6: 0
+                      frag_pkt_too_large: 0
+                      frag_overlap: 0
+                      frag_ignored: 0
+                    icmpv4:
+                      pkt_too_small: 0
+                      unknown_type: 0
+                      unknown_code: 0
+                      ipv4_trunc_pkt: 0
+                      ipv4_unknown_ver: 0
+                    icmpv6:
+                      unknown_type: 0
+                      unknown_code: 0
+                      pkt_too_small: 0
+                      ipv6_unknown_version: 0
+                      ipv6_trunc_pkt: 0
+                      mld_message_with_invalid_hl: 0
+                      unassigned_type: 0
+                      experimentation_type: 0
+                    ipv6:
+                      pkt_too_small: 0
+                      trunc_pkt: 0
+                      trunc_exthdr: 0
+                      exthdr_dupl_fh: 0
+                      exthdr_useless_fh: 0
+                      exthdr_dupl_rh: 0
+                      exthdr_dupl_hh: 0
+                      exthdr_dupl_dh: 0
+                      exthdr_dupl_ah: 0
+                      exthdr_dupl_eh: 0
+                      exthdr_invalid_optlen: 0
+                      wrong_ip_version: 0
+                      exthdr_ah_res_not_null: 0
+                      hopopts_unknown_opt: 0
+                      hopopts_only_padding: 0
+                      dstopts_unknown_opt: 0
+                      dstopts_only_padding: 0
+                      rh_type_0: 0
+                      zero_len_padn: 0
+                      fh_non_zero_reserved_field: 0
+                      data_after_none_header: 0
+                      unknown_next_header: 0
+                      icmpv4: 0
+                      frag_pkt_too_large: 0
+                      frag_overlap: 0
+                      frag_invalid_length: 0
+                      frag_ignored: 0
+                      ipv4_in_ipv6_too_small: 0
+                      ipv4_in_ipv6_wrong_version: 0
+                      ipv6_in_ipv6_too_small: 0
+                      ipv6_in_ipv6_wrong_version: 0
+                    tcp:
+                      pkt_too_small: 0
+                      hlen_too_small: 0
+                      invalid_optlen: 0
+                      opt_invalid_len: 0
+                      opt_duplicate: 0
+                    udp:
+                      pkt_too_small: 0
+                      hlen_too_small: 0
+                      hlen_invalid: 0
+                    sll:
+                      pkt_too_small: 0
+                    ethernet:
+                      pkt_too_small: 0
+                    ppp:
+                      pkt_too_small: 0
+                      vju_pkt_too_small: 0
+                      ip4_pkt_too_small: 0
+                      ip6_pkt_too_small: 0
+                      wrong_type: 0
+                      unsup_proto: 0
+                    pppoe:
+                      pkt_too_small: 0
+                      wrong_code: 0
+                      malformed_tags: 0
+                    gre:
+                      pkt_too_small: 0
+                      wrong_version: 0
+                      version0_recur: 0
+                      version0_flags: 0
+                      version0_hdr_too_big: 0
+                      version0_malformed_sre_hdr: 0
+                      version1_chksum: 0
+                      version1_route: 0
+                      version1_ssr: 0
+                      version1_recur: 0
+                      version1_flags: 0
+                      version1_no_key: 0
+                      version1_wrong_protocol: 0
+                      version1_malformed_sre_hdr: 0
+                      version1_hdr_too_big: 0
+                    vlan:
+                      header_too_small: 0
+                      unknown_type: 0
+                      too_many_layers: 0
+                    ieee8021ah:
+                      header_too_small: 0
+                    vntag:
+                      header_too_small: 0
+                      unknown_type: 0
+                    ipraw:
+                      invalid_ip_version: 0
+                    ltnull:
+                      pkt_too_small: 0
+                      unsupported_type: 0
+                    sctp:
+                      pkt_too_small: 0
+                    esp:
+                      pkt_too_small: 0
+                    mpls:
+                      header_too_small: 0
+                      pkt_too_small: 0
+                      bad_label_router_alert: 0
+                      bad_label_implicit_null: 0
+                      bad_label_reserved: 0
+                      unknown_payload_type: 0
+                    vxlan:
+                      unknown_payload_type: 0
+                    geneve:
+                      unknown_payload_type: 0
+                    erspan:
+                      header_too_small: 0
+                      unsupported_version: 0
+                      too_many_vlan_layers: 0
+                    dce:
+                      pkt_too_small: 0
+                    chdlc:
+                      pkt_too_small: 0
+                    nsh:
+                      header_too_small: 0
+                      unsupported_version: 0
+                      bad_header_length: 0
+                      reserved_type: 0
+                      unsupported_type: 0
+                      unknown_payload: 0
+                  too_many_layers: 0
+                flow:
+                  memcap: 0
+                  total: 0
+                  active: 0
+                  tcp: 0
+                  udp: 0
+                  icmpv4: 0
+                  icmpv6: 0
+                  tcp_reuse: 0
+                  get_used: 0
+                  get_used_eval: 0
+                  get_used_eval_reject: 0
+                  get_used_eval_busy: 0
+                  get_used_failed: 0
+                  wrk:
+                    spare_sync_avg: 0
+                    spare_sync: 0
+                    spare_sync_incomplete: 0
+                    spare_sync_empty: 0
+                    flows_evicted_needs_work: 0
+                    flows_evicted_pkt_inject: 0
+                    flows_evicted: 0
+                    flows_injected: 0
+                    flows_injected_max: 0
+                  end:
+                    state:
+                      new: 0
+                      established: 0
+                      closed: 0
+                      local_bypassed: 0
+                    tcp_state:
+                      none: 0
+                      syn_sent: 0
+                      syn_recv: 0
+                      established: 0
+                      fin_wait1: 0
+                      fin_wait2: 0
+                      time_wait: 0
+                      last_ack: 0
+                      close_wait: 0
+                      closing: 0
+                      closed: 0
+                    tcp_liberal: 0
+                  mgr:
+                    full_hash_pass: 15
+                    rows_per_sec: 6553
+                    rows_maxlen: 0
+                    flows_checked: 0
+                    flows_notimeout: 0
+                    flows_timeout: 0
+                    flows_timeout_inuse: 0
+                    flows_evicted: 0
+                    flows_evicted_needs_work: 0
+                  spare: 10000
+                  emerg_mode_entered: 0
+                  emerg_mode_over: 0
+                  recycler:
+                    recycled: 0
+                    queue_avg: 0
+                    queue_max: 0
+                  memuse: 7394304
+                tcp:
+                  active_sessions: 0
+                  sessions: 0
+                  ssn_memcap_drop: 0
+                  ssn_from_cache: 0
+                  ssn_from_pool: 0
+                  pseudo: 0
+                  pseudo_failed: 0
+                  invalid_checksum: 0
+                  no_flow: 0
+                  syn: 0
+                  synack: 0
+                  rst: 0
+                  midstream_pickups: 0
+                  pkt_on_wrong_thread: 0
+                  segment_memcap_drop: 0
+                  segment_from_cache: 0
+                  segment_from_pool: 0
+                  stream_depth_reached: 0
+                  reassembly_gap: 0
+                  overlap: 0
+                  overlap_diff_data: 0
+                  insert_data_normal_fail: 0
+                  insert_data_overlap_fail: 0
+                  memuse: 7274496
+                  reassembly_memuse: 1376256
+                defrag:
+                  ipv4:
+                    fragments: 0
+                    reassembled: 0
+                    timeouts: 0
+                  ipv6:
+                    fragments: 0
+                    reassembled: 0
+                    timeouts: 0
+                  max_frag_hits: 0
+                flow_bypassed:
+                  local_pkts: 0
+                  local_bytes: 0
+                  local_capture_pkts: 0
+                  local_capture_bytes: 0
+                  closed: 0
+                  pkts: 0
+                  bytes: 0
+                detect:
+                  engines:
+                    - id: 0
+                      last_reload: '2023-02-01T01:00:45.123456+00:00'
+                      rules_loaded: 21944
+                      rules_failed: 2
+                  alert: 0
+                  alert_queue_overflow: 0
+                  alerts_suppressed: 0
+                app_layer:
+                  flow:
+                    http: 0
+                    ftp: 0
+                    smtp: 0
+                    tls: 0
+                    ssh: 0
+                    imap: 0
+                    smb: 0
+                    dcerpc_tcp: 0
+                    dns_tcp: 0
+                    nfs_tcp: 0
+                    ntp: 0
+                    ftp-data: 0
+                    tftp: 0
+                    ike: 0
+                    krb5_tcp: 0
+                    quic: 0
+                    dhcp: 0
+                    snmp: 0
+                    sip: 0
+                    rfb: 0
+                    mqtt: 0
+                    telnet: 0
+                    rdp: 0
+                    http2: 0
+                    failed_tcp: 0
+                    dcerpc_udp: 0
+                    dns_udp: 0
+                    nfs_udp: 0
+                    krb5_udp: 0
+                    failed_udp: 0
+                  tx:
+                    http: 0
+                    ftp: 0
+                    smtp: 0
+                    tls: 0
+                    ssh: 0
+                    imap: 0
+                    smb: 0
+                    dcerpc_tcp: 0
+                    dns_tcp: 0
+                    nfs_tcp: 0
+                    ntp: 0
+                    ftp-data: 0
+                    tftp: 0
+                    ike: 0
+                    krb5_tcp: 0
+                    quic: 0
+                    dhcp: 0
+                    snmp: 0
+                    sip: 0
+                    rfb: 0
+                    mqtt: 0
+                    telnet: 0
+                    rdp: 0
+                    http2: 0
+                    dcerpc_udp: 0
+                    dns_udp: 0
+                    nfs_udp: 0
+                    krb5_udp: 0
+                  error:
+                    http:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    ftp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    smtp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    tls:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    ssh:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    imap:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    smb:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    dcerpc_tcp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    dns_tcp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    nfs_tcp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    ntp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    ftp-data:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    tftp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    ike:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    krb5_tcp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    quic:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    dhcp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    snmp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    sip:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    rfb:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    mqtt:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    telnet:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    rdp:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    http2:
+                      gap: 0
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    failed_tcp:
+                      gap: 0
+                    dcerpc_udp:
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    dns_udp:
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    nfs_udp:
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                    krb5_udp:
+                      alloc: 0
+                      parser: 0
+                      internal: 0
+                  expectations: 0
+                http:
+                  memuse: 0
+                  memcap: 0
+                ftp:
+                  memuse: 0
+                  memcap: 0
+                file_store:
+                  open_files: 0
+            ft_stats:
+              memif_bytes_dropped: 5990
+              memif_bytes_sent: 21282
+              memif_packets_dropped: 30
+              memif_packets_sent: 246
+              packets_received: 276
+              bytes_received: 27272
+            interface_stats:
+              interfaces:
+                - byte_dropped: 0
+                  byte_received: 0
+                  byte_received_perf: 0
+                  ierrors: 0
+                  imissed: 0
+                  ipackets: 0
+                  mbuf_9k_alloc_failed: 0
+                  mbuf_9k_alloc_ok: 0
+                  mbuf_9k_populate_failed: 0
+                  name: eth0
+                  no_packet: 0
+                  packet_dropped: 0
+                  packet_received: 0
+                  packet_received_perf: 0
+                  rx_loop: 0
+                  rx_nombuf: 0
+                  speed: 0
+                  status: down
+                  tx_attempt: 0
+                  tx_loop: 0
+                  tx_packet_dropped: 0
+                  type: ixgbe
+                - byte_dropped: 0
+                  byte_received: 0
+                  byte_received_perf: 0
+                  ierrors: 0
+                  imissed: 0
+                  ipackets: 0
+                  mbuf_9k_alloc_failed: 0
+                  mbuf_9k_alloc_ok: 0
+                  mbuf_9k_populate_failed: 0
+                  name: eth1
+                  no_packet: 0
+                  packet_dropped: 0
+                  packet_received: 0
+                  packet_received_perf: 0
+                  rx_loop: 0
+                  rx_nombuf: 0
+                  speed: 0
+                  status: down
+                  tx_attempt: 0
+                  tx_loop: 0
+                  tx_packet_dropped: 0
+                  type: ixgbe
+                - byte_dropped: 0
+                  byte_received: 27272
+                  byte_received_perf: 0
+                  ierrors: 0
+                  imissed: 0
+                  ipackets: 276
+                  mbuf_9k_alloc_failed: 0
+                  mbuf_9k_alloc_ok: 0
+                  mbuf_9k_populate_failed: 0
+                  name: eth2
+                  no_packet: 9129055228
+                  packet_dropped: 0
+                  packet_received: 276
+                  packet_received_perf: 0
+                  rx_loop: 9129055499
+                  rx_nombuf: 0
+                  speed: 1000
+                  status: up
+                  tx_attempt: 0
+                  tx_loop: 0
+                  tx_packet_dropped: 0
+                  type: dpdk
+                - byte_dropped: 0
+                  byte_received: 0
+                  byte_received_perf: 0
+                  ierrors: 0
+                  imissed: 0
+                  ipackets: 0
+                  mbuf_9k_alloc_failed: 0
+                  mbuf_9k_alloc_ok: 0
+                  mbuf_9k_populate_failed: 0
+                  name: eth3
+                  no_packet: 0
+                  packet_dropped: 0
+                  packet_received: 0
+                  packet_received_perf: 0
+                  rx_loop: 0
+                  rx_nombuf: 0
+                  speed: 0
+                  status: down
+                  tx_attempt: 0
+                  tx_loop: 0
+                  tx_packet_dropped: 0
+                  type: dpdk
+            forwarder_stats:
+              events_processed: 0
+              events_sent: 0
+              alerts_dropped_for_rate_limit: 0
+              alerts_dropped_for_rate_limit_this_hour: 0
+            device_serial: U12312300000123
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+    statusNoDevice:
+      summary: No device
+      value:
+        status: []
+    statusNoDataInCacheOneDevice:
+      summary: One device with no data
+      value:
+        status:
+          - device_serial: U12312300000123
+            is_enabled: true
+            process_health: null
+            timestamp: null
+    statusNoDataInCacheThreeDevices:
+      summary: Three devices with no data
+      value:
+        status:
+          - device_serial: U12312300000123
+            is_enabled: true
+            process_health: null
+            timestamp: null
+          - device_serial: U12312300000456
+            is_enabled: true
+            process_health: null
+            timestamp: null
+          - device_serial: U12312300000789
+            is_enabled: true
+            process_health: null
+            timestamp: null
+    statusOneDevice:
+      summary: One device
+      value:
+        status:
+          - device_serial: U12312300000123
+            is_enabled: true
+            process_health: healthy
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+    statusThreeDevices:
+      summary: Three devices
+      value:
+        status:
+          - device_serial: U12312300000123
+            is_enabled: true
+            process_health: healthy
+            process_error_detail: ''
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+          - device_serial: U12312300000456
+            is_enabled: true
+            process_health: healthy
+            process_error_detail: ''
+            timestamp: '2023-02-01T01:23:46.234567+00:00'
+          - device_serial: U12312300000789
+            is_enabled: true
+            process_health: healthy
+            process_error_detail: ''
+            timestamp: '2023-02-01T01:23:47.345678+00:00'
+    statusUnhealthyDevices:
+      summary: Some unhealthy devices
+      value:
+        status:
+          - device_serial: U12312300000123
+            is_enabled: true
+            process_health: healthy
+            process_error_detail: ''
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+          - device_serial: U12312300000456
+            is_enabled: true
+            process_health: unhealthy
+            process_error_detail: Excessive packet drops in Vectra Match
+            timestamp: '2023-02-01T01:23:46.234567+00:00'
+          - device_serial: U12312300000789
+            is_enabled: true
+            process_health: unhealthy
+            process_error_detail: Vectra Match service unhealthy on device
+            timestamp: '2023-02-01T01:23:47.345678+00:00'
+    availableDevicesNoDevice:
+      summary: No device
+      value:
+        devices: []
+    availableDevicesMixedModeOnly:
+      summary: Only mixed mode device
+      value:
+        devices:
+          - device_serial: U12312300000123
+            ip_address: 192.168.0.10
+            is_virtual: false
+            mode: mixed
+            product_name: X29v2
+            version: 8.4.0-9-31
+    availableDevicesSensorsAndMixedMode:
+      summary: Sensors and mixed mode devices
+      value:
+        devices:
+          - device_serial: U12312300000123
+            ip_address: 192.168.0.10
+            is_virtual: false
+            mode: mixed
+            product_name: X29v2
+            version: 8.4.0-9-31
+          - alias: Sensor-Office
+            device_serial: Vaaabbbcccdddeeefffggghhhiii2345
+            headend_uri: vsensor-office.example.local
+            ip_address: 192.168.1.10
+            is_virtual: true
+            last_seen: '2023-02-01T12:34:56Z'
+            location: Main Office
+            mode: sensor
+            product_name: vSensor
+            version: 8.4.0-9-31
+          - alias: Sensor-DC
+            device_serial: U12312300000789
+            headend_uri: x29v2-5-10.example.local
+            ip_address: 192.168.2.10
+            is_virtual: false
+            last_seen: '2023-02-01T01:23:45Z'
+            location: New Office
+            mode: sensor
+            product_name: S11
+            version: 8.4.0-9-31
+    rulesSingleRuleNoDevice:
+      summary: Single rule with no device
+      value:
+        device_serials: []
+        hashsum: e5227116937f484e3044ba1f28d6053edb33fc565581d0fda73b587d6a2bfed9
+        name: valid_rules.rules
+        notes: The notes you want to have in to describe this ruleset, could be any string
+        timestamp: '2023-02-01T01:23:45.123456+00:00'
+        uuid: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+    rulesSuccessDeletion:
+      summary: Rule deletion success
+      value:
+        details: success
+    rulesetUploadPending:
+      summary: Upload is waiting to receive uploaded file
+      value:
+        id: d42196ef-e946-4813-8fa9-641df68d7cbb
+        upload_status: pending
+        external_task_status: not_started
+        external_task_updated_at: null
+    rulesetUploadCompleted:
+      summary: Upload is completed but processing
+      value:
+        id: 5e5a3207-c204-4ddb-9e9e-d55801aecb75
+        upload_status: completed
+        created_at: '2024-06-27T16:08:34Z'
+        external_task_status: in_progress
+        external_task_updated_at: '2024-06-27T16:09:57Z'
+    rulesetUploadList:
+      summary: List of ruleset uploads
+      value:
+        results:
+          - id: d42196ef-e946-4813-8fa9-641df68d7cbb
+            upload_status: pending
+            external_task_status: not_started
+            external_task_updated_at: null
+          - id: d95cafc8-1c66-4a97-a978-9d52afaa3b56
+            upload_status: pending
+            created_at: '2024-06-27T16:03:26Z'
+            external_task_status: not_started
+            external_task_updated_at: null
+          - id: 5e5a3207-c204-4ddb-9e9e-d55801aecb75
+            upload_status: completed
+            created_at: '2024-06-27T16:08:34Z'
+            external_task_status: in_progress
+            external_task_updated_at: '2024-06-27T16:09:57Z'
+        count: 3
+    rulesetUploadStartRequestBodyWithoutNotes:
+      summary: Start a ruleset upload without notes
+      value:
+        file_name: example.rules
+    rulesetUploadStartRequestBodyWithNotes:
+      summary: Start a ruleset upload with notes
+      value:
+        file_name: example.rules
+        notes: This is an example note.
+    rulesetUploadUpdateRequestBodyCompleted:
+      summary: Mark the upload as completed
+      value:
+        upload_status: completed
+    rulesetUploadUpdateRequestBodyAborted:
+      summary: Mark the upload as aborted
+      value:
+        upload_status: aborted
+    rulesetUploadUpdateCompleted:
+      summary: The upload is marked as completed
+      value:
+        upload_status: completed
+    rulesetUploadUpdateAborted:
+      summary: The upload is marked as aborted
+      value:
+        upload_status: aborted
+    assignmentsNoRulesFile:
+      summary: No assignments and no rules file
+      value:
+        device_to_rules_map: []
+        rules_to_devices_map: []
+    assignmentsOneRuleThreeDevices:
+      summary: One ruleset assigned to three devices
+      value:
+        device_to_rules_map:
+          - device_serial: U12312300000123
+            rules:
+              - 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+            updated_by: vadmin
+          - device_serial: U12312300000456
+            rules:
+              - 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+            updated_by: vadmin
+          - device_serial: U12312300000789
+            rules:
+              - 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+            updated_by: vadmin
+        rules_to_devices_map:
+          - device_serials:
+              - U12312300000123
+              - U12312300000456
+              - U12312300000789
+            hashsum: e5227116937f484e3044ba1f28d6053edb33fc565581d0fda73b587d6a2bfed9
+            name: valid_rules.rules
+            notes: The notes you want to have in to describe this ruleset, could be any string
+            timestamp: '2023-02-01T01:23:45.123456+00:00'
+            uuid: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+    assignmentsUpdateRequestQueryOneToOne:
+      summary: One uuid with one device
+      value:
+        uuid: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+        device_serials:
+          - U12312300000123
+    assignmentsUpdateRequestQueryOneToMany:
+      summary: One uuid with three devices
+      value:
+        uuid: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+        device_serials:
+          - U12312300000123
+          - U12312300000456
+          - U12312300000789
+    assignmentsSuccessUpdate:
+      summary: Assignment update success
+      value:
+        details: success
+    assignmentsDeleteRequestQuery:
+      summary: Delete one assignment
+      value:
+        uuid: 6aea451c-4156-4ac6-bbeb-c9e0b16b1da5
+        device_serial: U12312300000123
+    assignmentsSuccessDelete:
+      summary: Assignment delete success
+      value:
+        details: success
+    alertStatsNoDevice:
+      summary: No device
+      value:
+        alert_stats: []
+    alertStatsNoDataOneDevice:
+      summary: One device with no data
+      value:
+        alert_stats:
+          - device_serial: U12312300000123
+            eve_log_rotated_time: null
+            top_alert_counts: null
+    alertStatsOneDevice:
+      summary: One device
+      value:
+        alert_stats:
+          - device_serial: U12312300000123
+            eve_log_rotated_time: '2023-02-01T01:23:45'
+            top_alert_counts:
+              - count: 1234
+                signature: ET POLICY Outgoing Basic Auth Base64 HTTP Password detected unencrypted
+                signature_id: 20230001
+              - count: 987
+                signature: ET INFO Python SimpleHTTP ServerBanner
+                signature_id: 20230101
+    alertStatsThreeDevices:
+      summary: Three devices
+      value:
+        alert_stats:
+          - device_serial: U12312300000123
+            eve_log_rotated_time: '2023-02-01T01:23:45'
+            top_alert_counts:
+              - count: 1234
+                signature: ET POLICY Outgoing Basic Auth Base64 HTTP Password detected unencrypted
+                signature_id: 20230001
+              - count: 987
+                signature: ET INFO Python SimpleHTTP ServerBanner
+                signature_id: 20230101
+          - device_serial: U12312300000456
+            eve_log_rotated_time: '2023-02-01T12:34:56'
+            top_alert_counts:
+              - count: 34
+                signature: ET SCAN Behavioral Unusual Port 137 traffic Potential Scan or Infection
+                signature_id: 2001580
+              - count: 10
+                signature: ET USER_AGENTS Microsoft Device Metadata Retrieval Client User-Agent
+                signature_id: 2027390
+          - device_serial: U12312300000789
+            eve_log_rotated_time: '2023-02-01T21:34:56'
+            top_alert_counts:
+              - count: 12
+                signature: ET INFO Python SimpleHTTP ServerBanner
+                signature_id: 20230101
+  responses:
+    unauthenticated:
+      description: You must be authenticated to perform this operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: You must be authenticated to perform this action.
+    unauthorized:
+      description: Cannot perform this operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: You do not have permission to perform this action.
+    deviceNotConnected:
+      description: Device serial unknown
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Provided device serial is not connected/paired
+    internalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Internal Server Error
+    invalidSerial:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: device_serial provided is not a string
+    notProvidedOrInvalidUUID:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: uuid not provided or is not a string
+    unknownRulesetUUID:
+      description: UUID rules file does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Provided rules file uuid does not exist
+    invalidUUID:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Provide rules file uuid is invalid
+    unknownRulesetUploadUUID:
+      description: UUID ruleset upload does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Provided ruleset upload uuid does not exist
+    unlicensedOrUnauthorized:
+      description: Cannot perform this operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          examples:
+            Unauthorized:
+              $ref: '#/components/examples/unauthorized'
+            Not-licensed:
+              $ref: '#/components/examples/errorNotLicensed'
+    uuidOrSerialDoesNotExist:
+      description: Unknown request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+            example:
+              details: Failed to assign Vectra Match ruleset, due to invalid uuid or serial which does not exist or is not paired
+    curatedRulesetFileNotFound:
+      description: The Vectra curated ruleset was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Vectra curated ruleset was not found.
+    curatedRulesetUnexpectedError:
+      description: Unexpected or error response from Vectra Match received.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ruxError'
+          example:
+            details: Unexpected or error response from Vectra Match received
+    rulesetUploadAccessExpired:
+      description: Access has expired
+      content:
+        application/xml:
+          schema:
+            type: object
+            properties:
+              Code:
+                type: string
+              Message:
+                type: string
+              Expires:
+                type: string
+              ServerTime:
+                type: string
+              RequestId:
+                type: string
+              HostId:
+                type: string
+            required:
+              - Code
+              - Message
+              - Expires
+              - ServerTime
+              - RequestId
+              - HostId
+            xml:
+              name: Error
+          example:
+            Code: AccessDenied
+            Message: Request has expired
+            Expires: '2024-06-27T13:09:56Z'
+            ServerTime: '2024-06-27T13:10:10Z'
+            RequestId: ...
+            HostId: ...
