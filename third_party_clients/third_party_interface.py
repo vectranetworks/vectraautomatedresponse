@@ -1,30 +1,38 @@
 import abc
 from abc import ABCMeta
-from vectra_automated_response_consts import VectraHost, VectraAccount, VectraDetection, VectraStaticIP
+
+from vectra_automated_response_consts import (
+    VectraAccount,
+    VectraDetection,
+    VectraHost,
+    VectraStaticIP,
+)
 
 
 class ThirdPartyInterface(metaclass=abc.ABCMeta):
     @classmethod
     def __subclasshook__(cls, subclass):
-        return (hasattr(subclass, 'block_host') and 
-                callable(subclass.block_host) and
-                hasattr(subclass, 'block_account') and
-                callable(subclass.block_account) and
-                hasattr(subclass, 'unblock_host') and 
-                callable(subclass.unblock_host) and
-                hasattr(subclass, 'unblock_account') and
-                callable(subclass.unblock_account) and
-                hasattr(subclass, 'groom_host') and
-                callable(subclass.groom_host) and
-                hasattr(subclass, 'block_detection') and 
-                callable(subclass.block_detection) and  
-                hasattr(subclass, 'unblock_detection') and
-                callable(subclass.unblock_detection) and
-                hasattr(subclass, 'block_static_dst_ips') and
-                callable(subclass.block_static_ds_ips) and
-                hasattr(subclass, 'unblock_static_dst_ips') and
-                callable(subclass.unblock_static_dst_ips) or
-                NotImplemented)
+        return (
+            hasattr(subclass, "block_host")
+            and callable(subclass.block_host)
+            and hasattr(subclass, "block_account")
+            and callable(subclass.block_account)
+            and hasattr(subclass, "unblock_host")
+            and callable(subclass.unblock_host)
+            and hasattr(subclass, "unblock_account")
+            and callable(subclass.unblock_account)
+            and hasattr(subclass, "groom_host")
+            and callable(subclass.groom_host)
+            and hasattr(subclass, "block_detection")
+            and callable(subclass.block_detection)
+            and hasattr(subclass, "unblock_detection")
+            and callable(subclass.unblock_detection)
+            and hasattr(subclass, "block_static_dst_ips")
+            and callable(subclass.block_static_ds_ips)
+            and hasattr(subclass, "unblock_static_dst_ips")
+            and callable(subclass.unblock_static_dst_ips)
+            or NotImplemented
+        )
 
     def __init__(self):
         pass
@@ -38,18 +46,18 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def block_account(self, account: VectraAccount) -> list:
-        """
-        Block a VectraAccount instance on the corresponding system
-        :rtype: list of all elements that were blocked
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def unblock_host(self, host: VectraHost) -> list:
         """
         Unlock a VectraHost instance on the corresponding FW/NAC
         :rtype: list of all elements that were unblocked
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def block_account(self, account: VectraAccount) -> list:
+        """
+        Block a VectraAccount instance on the corresponding system
+        :rtype: list of all elements that were blocked
         """
         raise NotImplementedError
 
@@ -68,7 +76,7 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         :rtype: dictionary of all elements that require blocking or unblocking: {'block': [], 'unblock: []}
         """
         raise NotImplementedError
-    
+
     @abc.abstractmethod
     def block_detection(self, detection: VectraDetection) -> list:
         """

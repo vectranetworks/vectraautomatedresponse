@@ -1,16 +1,12 @@
 import base64
 import hashlib
-import io
 import json
 import logging
 import time
-import urllib.parse
-from enum import Enum, auto, unique
 
 import jwt
 import requests
 from common import _get_password
-from requests import HTTPError
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -27,7 +23,8 @@ from third_party_clients.trendmicro_apexone.apex_one_config import (
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "ApexOne Client"
-        self.logger = logging.getLogger("ApexOne")
+        self.module = "trendmicro_apexone"
+        self.init_log(kwargs)
         self.app_id = _get_password(
             "ApexOne", "Application_ID", modify=kwargs["modify"]
         )
@@ -35,7 +32,13 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         mac_addresses = host.mac_addresses
         mac_addresses = [mac.replace(":", "-") for mac in mac_addresses]
         ip_address = host.ip
@@ -48,7 +51,7 @@ class Client(ThirdPartyInterface):
                 self._patch_endpoint(mac_address=mac_address, act="cmd_isolate_agent")
             return mac_addresses
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         mac_addresses = host.mac_addresses
         mac_addresses = [mac.replace(":", "-") for mac in mac_addresses]
         ip_address = host.ip
@@ -65,41 +68,49 @@ class Client(ThirdPartyInterface):
                 )
             return mac_addresses
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("ApexOne client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement detection-based blocking")
+        self.logger.warning(
+            "ApexOne client does not implement detection-based blocking"
+        )
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement detection-based blocking")
+        self.logger.warning(
+            "ApexOne client does not implement detection-based blocking"
+        )
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement account-based blocking")
+        self.logger.warning("ApexOne client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement account-based blocking")
+        self.logger.warning("ApexOne client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement static IP-based blocking")
+        self.logger.warning(
+            "ApexOne client does not implement static IP-based blocking"
+        )
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("ApexOne client does not implement static IP-based blocking")
+        self.logger.warning(
+            "ApexOne client does not implement static IP-based blocking"
+        )
         return []
 
-    def _patch_endpoint(self, act, mac_address="", ip_address=""):
+    def _patch_endpoint(self, act, mac_address="", ip_address="", **kwargs):
         payload = {"act": act, "allow_multiple_match": False}
 
         if ip_address:

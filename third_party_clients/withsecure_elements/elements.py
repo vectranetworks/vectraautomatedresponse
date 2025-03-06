@@ -1,9 +1,9 @@
-import base64
 import logging
 from datetime import datetime, timedelta
 
 import requests
 from cachetools import TTLCache, cached
+from common import _get_password
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -13,18 +13,17 @@ from third_party_clients.third_party_interface import (
 )
 from third_party_clients.withsecure_elements.elements_config import (
     BASE_URL,
-    VERIFY,
+    CHECK_SSL,
 )
-
-from common import _get_password
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "WithSecureElements Client"
+        self.module = "withsecure_elements"
         self.logger = logging.getLogger()
         self.url = BASE_URL
-        self.verify = VERIFY
+        self.verify = CHECK_SSL
         self.auth = (
             _get_password("Elements", "Client_ID", modify=kwargs["modify"]),
             _get_password("Elements", "API_Key", modify=kwargs["modify"]),

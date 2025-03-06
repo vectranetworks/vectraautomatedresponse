@@ -1,24 +1,24 @@
 import argparse
 import importlib
 import ipaddress
+import json
 import logging
+import logging.config
 import os
 import re
 import smtplib
 import socket
+import ssl
 import sys
 import time
-import json
 import warnings
 from datetime import datetime, timedelta
 from logging.handlers import SysLogHandler
 from multiprocessing import Process
 from typing import Dict, Optional
 
-import keyring
-import questionary
+import custom_log
 import requests
-import saas
 from common import _get_password
 from config import (
     BLOCK_ACCOUNT_DETECTION_TYPES,
@@ -59,8 +59,8 @@ from config import (
     SYSLOG_PROTO,
     SYSLOG_SERVER,
     THIRD_PARTY_CLIENTS,
-    V3,
 )
+from keyrings.alt import file
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from vectra_automated_response_consts import (
@@ -70,10 +70,23 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-import vat.vectra as vectra
+import keyring
+from vat.platform import ClientV3_latest
+from vat.vectra import ClientV2_latest
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
+
+version = "3.0.0"
+
+
+class CustomAdapter(logging.LoggerAdapter):
+    def __init__(self, logger, extra):
+        super().__init__(logger, extra)
+
+    def process(self, record):
+        record.brain = self.brain
+        return True
 
 
 def namestr(obj, namespace):
@@ -85,7 +98,6 @@ class TypeException(TypeError):
         logger.error(f"{imported_list} is not of {val}.")
 
 
-URL_REGEX = r"^http[s]?://\d{12}.(uw2|ew1|cc1|as2).portal.vectra.ai.*$"
 clients = {}
 for client in os.listdir("third_party_clients"):
     if client not in [
@@ -128,41 +140,16 @@ HostDict = Dict[str, VectraHost]
 AccountDict = Dict[str, VectraAccount]
 DetectionDict = Dict[str, VectraDetection]
 
-
-def get_rux_tokens():
-    rux_tokens = keyring.get_password(url, "rux_tokens")
-    if rux_tokens:
-        rux_tokens = json.loads(rux_tokens)
-        if rux_tokens.get("_accessTime") > round(time.time()):
-            return rux_tokens
-        else:
-            print("Tokens expired!")
-    return {}
+URL = "portal.vectra.ai"
 
 
-def log_conf(debug):
-    if LOG_TO_FILE:
-        logging.basicConfig(
-            filename=LOG_FILE,
-            format="%(asctime)s: %(message)s",
-            encoding="utf-8",
-            level=logging.DEBUG,
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    elif debug:
-        logging.basicConfig(
-            format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
-            encoding="utf-8",
-            level=logging.DEBUG,
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    else:
-        logging.basicConfig(
-            format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
-            encoding="utf-8",
-            level=logging.INFO,
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+def log_conf():
+    logging.basicConfig(
+        format="%(asctime)s:%(levelname)s:%(name)s: %(message)s",
+        encoding="utf-8",
+        level=logging.DEBUG,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 class HTTPException(Exception):
@@ -191,31 +178,7 @@ class HTTPException(Exception):
         super().__init__(body)
 
 
-class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4):
-    def __init__(
-        self,
-        url: Optional[str] = "",
-        token: Optional[str] = "",
-        client_id: Optional[str] = "",
-        secret_key: Optional[str] = "",
-        verify: bool = False,
-    ) -> None:
-        """
-        Initialize Vectra client
-
-        :param url: IP or hostname of Vectra brain - required
-        :param token: V2 API token for authentication - required
-        :param client_id: V3 API Client ID for authentication - required
-        :param secret_key: V3 API Secret Key for authentication - required
-        :param verify: verify SSL - optional
-        """
-        if re.match(URL_REGEX, url, re.IGNORECASE):
-            rux_tokens = get_rux_tokens()
-            super().__init__(url, client_id, secret_key, rux_tokens, verify)
-        else:
-            super().__init__(url, token, verify)
-        self.logger = logging.getLogger("VectraClient")
-
+class VectraClient:
     def get_account_by_uid(self, uid: str) -> list:
         """
         Searches for accounts by account UID
@@ -582,7 +545,8 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
 
         tagged_hosts = self.get_tagged_hosts(tag=block_tag) if block_tag else {}
 
-        if V3:
+        # if V3:
+        if URL in self.url:
             if min_urgency_score is not None:
                 min_tc_score = None
         else:
@@ -630,7 +594,8 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         :rtype: AccountDict
         """
         tagged_accounts = self.get_tagged_accounts(tag=block_tag) if block_tag else {}
-        if V3:
+        # if V3:
+        if URL in self.url:
             if min_urgency_score is not None:
                 min_tc_score = None
         else:
@@ -860,8 +825,83 @@ class VectraClient(saas.VectraSaaSClientV3_3 if V3 else vectra.VectraClientV2_4)
         return {**tagged_detections, **typed_detections, **detections_of_scored_hosts}
 
 
-class VectraAutomatedResponse(object):
+class VectraClientV3(ClientV3_latest, VectraClient):
+    """
+    Initialize Vectra client V3
+    :param url: IP or hostname of Vectra brain - required
+    :param client_id: V3 API Client ID for authentication - required
+    :param secret_key: V3 API Secret Key for authentication - required
+    :param verify: verify SSL - optional
+    """
 
+    def __init__(
+        self,
+        url: Optional[str] = "",
+        client_id: Optional[str] = "",
+        secret_key: Optional[str] = "",
+        verify: bool = False,
+    ) -> None:
+        super().__init__(
+            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+        )
+
+    def _check_token(self):
+        rux_tokens = self._get_rux_tokens()
+        if rux_tokens:
+            self._access = rux_tokens.get("_access", None)
+            self._accessTime = rux_tokens.get("_accessTime", None)
+            self._refresh = rux_tokens.get("_refresh", None)
+            self._refreshTime = rux_tokens.get("_refreshTime", None)
+        if not self._access:
+            self._get_token()
+            self._set_rux_tokens()
+        elif self._accessTime < int(time.time()):
+            self._refresh_token()
+            self._set_rux_tokens()
+
+    def _get_rux_tokens(self):
+        rux_tokens = keyring.get_password(self.url, "rux_tokens")
+        if rux_tokens:
+            rux_tokens = json.loads(rux_tokens)
+            if rux_tokens.get("_accessTime", 0) > round(time.time()):
+                return rux_tokens
+            else:
+                pass
+        return {}
+
+    def _set_rux_tokens(self):
+        keyring.set_password(
+            self.url,
+            "rux_tokens",
+            json.dumps(
+                {
+                    "_access": self._access,
+                    "_refresh": self._refresh,
+                    "_accessTime": self._accessTime,
+                    "_refreshTime": self._refreshTime,
+                }
+            ),
+        )
+
+
+class VectraClientV2(ClientV2_latest, VectraClient):
+    """
+    Initialize Vectra client V2
+    :param url: IP or hostname of Vectra brain - required
+    :param token: V2 API token for authentication - required
+    :param verify: verify SSL - optional
+    """
+
+    def __init__(
+        self,
+        url: Optional[str] = "",
+        token: Optional[str] = "",
+        verify: bool = False,
+    ) -> None:
+        super().__init__(url=url, token=token, verify=verify)
+
+
+class VectraAutomatedResponse(object):
     def __init__(
         self,
         brain: str,
@@ -885,11 +925,16 @@ class VectraAutomatedResponse(object):
         external_block_detection_types: list,
         external_block_detection_tag: Optional[str],
         static_dest_ip_block_file: str,
+        log_dict_config: dict,
     ):
         # Generic setup
-        self.logger = logging.getLogger("VAR")
         self.third_party_clients = third_party_clients
         self.vectra_api_client = vectra_api_client
+        logging.config.dictConfig(log_dict_config)
+        self.logger = logging.LoggerAdapter(
+            logger=logging.getLogger("VAR_Client"),
+            extra=dict(brain=self.vectra_api_client.url.split("/")[2]),
+        )
         # Internal (un)blocking variables
         self.block_host_tag = block_host_tag
         self.block_host_tc_score = block_host_tc_score
@@ -969,7 +1014,6 @@ class VectraAutomatedResponse(object):
 
         if len(blocked_hosts.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Find blocked hosts that should be unblocked
         hosts_wrongly_blocked = self._get_dict_keys_intersect(
@@ -986,7 +1030,6 @@ class VectraAutomatedResponse(object):
 
         if len(hosts_wrongly_blocked.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute hosts that should be blocked
         hosts_to_block = self._get_dict_keys_relative_complement(
@@ -1005,7 +1048,6 @@ class VectraAutomatedResponse(object):
 
         if len(hosts_to_block.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute hosts that should be unblocked
         hosts_to_unblock = self._get_dict_keys_relative_complement(
@@ -1022,7 +1064,6 @@ class VectraAutomatedResponse(object):
 
         if len(hosts_to_unblock.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         hosts_to_groom = {}
         if groom:
@@ -1039,12 +1080,6 @@ class VectraAutomatedResponse(object):
 
             if len(hosts_to_groom.keys()) > 0:
                 self.logger.info(message)
-                self.info_msg.append(message)
-
-                message = "Hosts to groom: {}".format(hosts_to_groom.keys())
-
-                self.logger.info(message)
-                self.info_msg.append(message)
 
         return hosts_to_block, hosts_to_unblock, hosts_to_groom
 
@@ -1079,7 +1114,6 @@ class VectraAutomatedResponse(object):
 
         if len(blocked_accounts.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Find blocked account that should be unblocked
         accounts_wrongly_blocked = self._get_dict_keys_intersect(
@@ -1096,7 +1130,6 @@ class VectraAutomatedResponse(object):
 
         if len(accounts_wrongly_blocked.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute accounts that should be blocked
         accounts_to_block = self._get_dict_keys_relative_complement(
@@ -1115,7 +1148,6 @@ class VectraAutomatedResponse(object):
 
         if len(accounts_to_block.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute accounts that should be unblocked
         accounts_to_unblock = self._get_dict_keys_relative_complement(
@@ -1132,7 +1164,6 @@ class VectraAutomatedResponse(object):
 
         if len(accounts_to_unblock.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         return accounts_to_block, accounts_to_unblock
 
@@ -1160,7 +1191,6 @@ class VectraAutomatedResponse(object):
 
         if len(blocked_detections.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Find blocked detections that should be unblocked
         detections_wrongly_blocked = self._get_dict_keys_intersect(
@@ -1175,7 +1205,6 @@ class VectraAutomatedResponse(object):
 
         if len(detections_wrongly_blocked.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute detections that should be blocked
         detections_to_block = self._get_dict_keys_relative_complement(
@@ -1194,7 +1223,6 @@ class VectraAutomatedResponse(object):
 
         if len(detections_to_block.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         # Compute detections that should be unblocked
         detections_to_unblock = self._get_dict_keys_relative_complement(
@@ -1211,7 +1239,6 @@ class VectraAutomatedResponse(object):
 
         if len(detections_to_unblock.keys()) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         return detections_to_block, detections_to_unblock
 
@@ -1271,19 +1298,40 @@ class VectraAutomatedResponse(object):
 
         if len(ips_to_block) > 0 or len(ips_to_unblock) > 0:
             self.logger.info(message)
-            self.info_msg.append(message)
 
         return ips_to_block, ips_to_unblock
 
     def block_hosts(self, hosts_to_block):
         for host_id, host in hosts_to_block.items():
+            usable_third_party_clients = [
+                tag.split(":")[1].lower()
+                for tag in host.tags
+                if tag.lower().startswith("client")
+            ]
             for third_party_client in self.third_party_clients:
+                if usable_third_party_clients == []:
+                    pass
+                else:
+                    try:
+                        self.logger.debug(
+                            f"TPC:{third_party_client.module.lower()}; Usable TPCs:{usable_third_party_clients}"
+                        )
+                        if (
+                            third_party_client.module.lower()
+                            not in usable_third_party_clients
+                        ):
+                            continue
+                    except AttributeError:
+                        continue
                 try:
                     # Block endpoint
                     blocked_elements = third_party_client.block_host(host=host)
                     if len(blocked_elements) > 0:
-                        message = "Blocked host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
+                        message = "Blocked host {id}, {name}, {ip} with client {client}".format(
+                            id=host_id,
+                            name=host.name,
+                            ip=host.ip,
+                            client=third_party_client.name,
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
@@ -1340,8 +1388,11 @@ class VectraAutomatedResponse(object):
                         for element in unblocked_elements:
                             blocked_elements[third_party_client.name].remove(element)
                             self.logger.debug("Unblocked element {}".format(element))
-                        message = "Unblocked host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
+                        message = "Unblocked host {id}, {name}, {ip} with client {client}".format(
+                            id=host_id,
+                            name=host.name,
+                            ip=host.ip,
+                            client=third_party_client.name,
                         )
                         tags = host.tags
                         if len(blocked_elements[third_party_client.name]) > 0:
@@ -1394,7 +1445,26 @@ class VectraAutomatedResponse(object):
 
     def groom_hosts(self, hosts_to_groom):
         for host_id, host in hosts_to_groom.items():
+            usable_third_party_clients = [
+                tag.split(":")[1].lower()
+                for tag in host.tags
+                if tag.lower().startswith("client")
+            ]
             for third_party_client in self.third_party_clients:
+                if usable_third_party_clients == []:
+                    pass
+                else:
+                    try:
+                        self.logger.debug(
+                            f"TPC:{third_party_client.module.lower()}; Usable TPCs:{usable_third_party_clients}"
+                        )
+                        if (
+                            third_party_client.module.lower()
+                            not in usable_third_party_clients
+                        ):
+                            continue
+                    except AttributeError:
+                        continue
                 groomed = third_party_client.groom_host(host=host)
                 self.logger.debug("groomed: {}".format(groomed))
                 if groomed["unblock"]:
@@ -1409,8 +1479,11 @@ class VectraAutomatedResponse(object):
                         unblocked_elements = third_party_client.unblock_host(host)
                         for element in unblocked_elements:
                             self.logger.debug("Unblocked element {}".format(element))
-                        message = "Unblocked host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
+                        message = "Unblocked host {id}, {name}, {ip} with client {client}".format(
+                            id=host_id,
+                            name=host.name,
+                            ip=host.ip,
+                            client=third_party_client.name,
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
@@ -1443,8 +1516,11 @@ class VectraAutomatedResponse(object):
                     try:
                         # Block endpoint
                         blocked_elements = third_party_client.block_host(host=host)
-                        message = "Blocked host {id} on client {client}".format(
-                            id=host_id, client=third_party_client.name
+                        message = "Blocked host {id}, {name}, {ip} with client {client}".format(
+                            id=host_id,
+                            name=host.name,
+                            ip=host.ip,
+                            client=third_party_client.name,
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
@@ -1485,7 +1561,26 @@ class VectraAutomatedResponse(object):
 
     def block_accounts(self, accounts_to_block):
         for account_id, account in accounts_to_block.items():
+            usable_third_party_clients = [
+                tag.split(":")[1].lower()
+                for tag in account.tags
+                if tag.lower().startswith("client")
+            ]
             for third_party_client in self.third_party_clients:
+                if usable_third_party_clients == []:
+                    pass
+                else:
+                    try:
+                        self.logger.debug(
+                            f"TPC:{third_party_client.module.lower()}; Usable TPCs:{usable_third_party_clients}"
+                        )
+                        if (
+                            third_party_client.module.lower()
+                            not in usable_third_party_clients
+                        ):
+                            continue
+                    except AttributeError:
+                        continue
                 try:
                     # Block account
                     blocked_elements = third_party_client.block_account(account=account)
@@ -1589,7 +1684,26 @@ class VectraAutomatedResponse(object):
 
     def block_detections(self, detections_to_block):
         for detection_id, detection in detections_to_block.items():
+            usable_third_party_clients = [
+                tag.split(":")[1].lower()
+                for tag in detection_id.tags
+                if tag.lower().startswith("client")
+            ]
             for third_party_client in self.third_party_clients:
+                if usable_third_party_clients == []:
+                    pass
+                else:
+                    try:
+                        self.logger.debug(
+                            f"TPC:{third_party_client.module.lower()}; Usable TPCs:{usable_third_party_clients}"
+                        )
+                        if (
+                            third_party_client.module.lower()
+                            not in usable_third_party_clients
+                        ):
+                            continue
+                    except AttributeError:
+                        continue
                 try:
                     # Block endpoint
                     blocked_elements = third_party_client.block_detection(
@@ -1710,65 +1824,131 @@ class VectraAutomatedResponse(object):
 
 # Functioned used to generate notification
 def generate_messages(messages, **kwargs):
-    if SEND_EMAIL:
-        logger.info("Sending email messages...")
-        i = 0
-        msg_type = ["Info", "Warning", "Error"]
-        string = ""
-        for collection in messages:
-            if collection != []:
-                string = msg_type[i] + "\n"
-                for message in collection:
-                    string += message
-                    string += "\n"
-            i += 1
+    if SEND_EMAIL or kwargs.get("test_smtp", False):
+        if kwargs.get("test_smtp", False):
+            if not all([SRC_EMAIL, DST_EMAIL, SMTP_USER, SMTP_SERVER, SMTP_PORT]):
+                logger.error("Configure SMTP to test.")
+                sys.exit()
+
         sender_id = SRC_EMAIL
         receiver_id = DST_EMAIL
         smtp_user = SMTP_USER
+        smtp = None
 
-        smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        smtp.starttls()
+        try:
+            smtp = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        except smtplib.SMTPException:
+            logger.debug("SMTP Server does not support SSL")
+        except ssl.SSLError as e:
+            logger.debug(str(e))
+
+        if smtp is None:
+            try:
+                smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+                smtp.starttls()
+            except smtplib.SMTPNotSupportedError:
+                logger.debug("SMTP Server does not support STARTTLS")
+                pass
 
         if SMTP_AUTH:
-            smtp.login(smtp_user, _get_password("VAR", "Email", kwargs))
+            try:
+                smtp.login(smtp_user, _get_password("VAR", "Email", kwargs))
+            except smtplib.SMTPAuthenticationError:
+                logger.error("SMTP Authentication Error")
 
-        email_body = string
-        email_subject = "Vectra Automated Response"
-        message = "Subject: {}\n\n{}".format(email_subject, email_body)
+        if not kwargs.get("test_smtp", False):
+            i = 0
+            msg_type = ["Info", "Warning", "Error"]
+            string = ""
+            for collection in messages:
+                if collection != []:
+                    string = msg_type[i] + "\n"
+                    for message in collection:
+                        string += message
+                        string += "\n"
+                i += 1
+            email_body = string
+            email_subject = "Vectra Automated Response"
+            message = "Subject: {}\n\n{}".format(email_subject, email_body)
+        else:
+            email_body = "Info: TEST TEST TEST"
+            email_subject = "TEST - Vectra Automated Response - TEST "
+            message = "Subject: {}\n\n{}".format(email_subject, email_body)
 
         # Sending Email
-        smtp.sendmail(sender_id, receiver_id, message)
+        try:
+            if email_body != "":
+                if kwargs.get("test_smtp", False):
+                    logger.info("Sending test email...")
+                else:
+                    logger.info("Sending email messages...")
+                smtp.sendmail(sender_id, receiver_id, message)
+        except smtplib.SMTPSenderRefused as err:
+            logger.error("Sender address refused: {}".format(err))
+        except smtplib.SMTPRecipientsRefused as err:
+            logger.error("Recipient address refused: {}".format(err))
+        except smtplib.SMTPDataError as err:
+            logger.error("Server refused to accept message data: {}".format(err))
+        except smtplib.SMTPException as err:
+            logger.error("SMTP Error: {}".format(err))
+
         # Close Session
         smtp.quit()
 
-    if SEND_SYSLOG:
-        logger.info("Sending syslog messages...")
+    if SEND_SYSLOG or kwargs.get("test_syslog", False):
         syslog = logging.getLogger("syslog")
         msg_type = ["Info", "Warning", "Error"]
         syslog_lvl = [syslog.info, syslog.warning, syslog.error]
         sev = [2, 5, 8]
-        i = 0
-        for collection in messages:
-            if collection != []:
-                string = msg_type[i] + ": "
-                for message in collection:
-                    string += message
-                    string += "; "
-                if SYSLOG_FORMAT == "CEF":
-                    msg = f"CEF:0|Vectra Networks|X Series|var|Vectra Automated Response|{sev[i]}|{string}"
-                elif SYSLOG_FORMAT == "Standard":
-                    msg = f"{string}"
+        if not kwargs.get("test_syslog", False):
+            i = 0
+            for collection in messages:
+                if collection != []:
+                    string = msg_type[i] + ": "
+                    for message in collection:
+                        string += message
+                        string += "; "
+                    if SYSLOG_FORMAT == "CEF":
+                        msg = f"CEF:0|Vectra Networks|X Series|var|Vectra Automated Response|{sev[i]}|{string}"
+                    elif SYSLOG_FORMAT == "Standard":
+                        msg = f"{string}"
 
-                syslog_lvl[i](msg)
-            i += 1
+                    logger.info("Sending syslog messages...")
+                    syslog_lvl[i](msg)
+                i += 1
+        else:
+            logger.info("Sending test syslog...")
+            string = "INFO: TEST TEST TEST"
+            if SYSLOG_FORMAT == "CEF":
+                msg = f"CEF:0|Vectra Networks|X Series|var|Vectra Automated Response|2|{string}"
+            elif SYSLOG_FORMAT == "Standard":
+                msg = f"{string}"
+            syslog_lvl[0](msg)
 
 
-def main(args, vectra_api_client, third_party_clients):
-    logger = logging.getLogger("VAR")
-    log_conf(args.debug)
+def conf_syslog():
+    try:
+        syslog = logging.getLogger("syslog")
+        syslog.setLevel(logging.INFO)
+        syslog.propagate = False
+        proto = {"TCP": socket.SOCK_STREAM, "UDP": socket.SOCK_DGRAM}
+        syslog_handle = SysLogHandler(
+            address=(SYSLOG_SERVER, int(SYSLOG_PORT)), socktype=proto[SYSLOG_PROTO]
+        )
+        syslog.addHandler(syslog_handle)
+    except ConnectionRefusedError:
+        logger.error("Check Syslog configurations.")
+
+
+# def main(args, vectra_api_client, third_party_clients, log_dict_config):
+def main(args, vectra_api_client, modify, log_dict_config):
     var = VectraAutomatedResponse(
         brain=vectra_api_client.url,
-        third_party_clients=third_party_clients,
+        # third_party_clients=third_party_clients,
+        third_party_clients=[
+            Third_Party_Client.Client(modify=modify, dict_config=log_dict_config)
+            for Third_Party_Client in Third_Party_Clients
+        ],
         vectra_api_client=vectra_api_client,
         block_host_tag=BLOCK_HOST_TAG,
         block_account_tag=BLOCK_ACCOUNT_TAG,
@@ -1788,17 +1968,11 @@ def main(args, vectra_api_client, third_party_clients):
         external_block_detection_types=EXTERNAL_BLOCK_DETECTION_TYPES,
         external_block_detection_tag=EXTERNAL_BLOCK_DETECTION_TAG,
         static_dest_ip_block_file=STATIC_BLOCK_DESTINATION_IPS,
+        log_dict_config=log_dict_config,
     )
 
     if SEND_SYSLOG:
-        syslog = logging.getLogger("syslog")
-        syslog.setLevel(logging.INFO)
-        syslog.propagate = False
-        proto = {"TCP": socket.SOCK_STREAM, "UDP": socket.SOCK_DGRAM}
-        syslog_handle = SysLogHandler(
-            address=(SYSLOG_SERVER, int(SYSLOG_PORT)), socktype=proto[SYSLOG_PROTO]
-        )
-        syslog.addHandler(syslog_handle)
+        conf_syslog()
 
     def take_action(alert):
         (
@@ -1806,21 +1980,6 @@ def main(args, vectra_api_client, third_party_clients):
             hosts_to_unblock,
             hosts_to_groom,
         ) = var.get_hosts_to_block_unblock(groom=args.groom)
-
-        # Store tokens for RUX
-        if vectra_api_client.version >= 3.0:
-            keyring.set_password(
-                vectra_api_client.base_url,
-                "rux_tokens",
-                json.dumps(
-                    {
-                        "_access": vectra_api_client._access,
-                        "_refresh": vectra_api_client._refresh,
-                        "_accessTime": vectra_api_client._accessTime,
-                        "_refreshTime": vectra_api_client._refreshTime,
-                    }
-                ),
-            )
 
         if not alert:
             var.block_hosts(hosts_to_block)
@@ -1850,8 +2009,8 @@ def main(args, vectra_api_client, third_party_clients):
 
         generate_messages((var.info_msg, var.warn_msg, var.err_msg))
         if len(var.info_msg) == len(var.warn_msg) == len(var.err_msg) == 0:
-            logger.info(f"{vectra_api_client.url.split('/')[2]}: No actions taken.")
-        logger.info(f"{vectra_api_client.url.split('/')[2]}: Run finished. \n")
+            var.logger.info("No actions taken.")
+        var.logger.info("Run finished.")
 
     def create_block_days():
         block_days = []
@@ -1985,12 +2144,55 @@ if __name__ == "__main__":
             help="Change secrets stored in keyring",
         )
 
+        parser.add_argument(
+            "--test_smtp",
+            default=False,
+            action="store_true",
+            help="Test SMTP configurations",
+        )
+
+        parser.add_argument(
+            "--test_syslog",
+            default=False,
+            action="store_true",
+            help="Test Syslog configurations",
+        )
+
+        parser.add_argument(
+            "--plaintext",
+            default=False,
+            action="store_true",
+            help="Utilize keyrings.alt.file",
+        )
+
         return parser.parse_args()
 
     args = obtain_args()
+    log_dict_config = custom_log.dict_config
 
+    for loggers in log_dict_config["loggers"]:
+        log_dict_config["loggers"][loggers]["level"] = (
+            "INFO" if not args.debug else "DEBUG"
+        )
+
+    logging.config.dictConfig(log_dict_config)
     logger = logging.getLogger("VAR")
-    log_conf(args.debug)
+
+    if args.plaintext:
+        keyring.set_keyring(file.PlaintextKeyring())
+
+    if args.test_syslog:
+        logger = logging.getLogger("Syslog")
+        log_conf()
+        conf_syslog()
+        generate_messages("", test_syslog=True)
+        sys.exit()
+
+    if args.test_smtp:
+        logger = logging.getLogger("SMTP")
+        log_conf()
+        generate_messages("", test_smtp=True)
+        sys.exit()
 
     exit = False
     for imported_list in [
@@ -2033,9 +2235,9 @@ if __name__ == "__main__":
     vectra_api_clients = []
     for url in COGNITO_URL:
         logger.debug(f"Configuring Vectra API Client for {url}")
-        if re.match(URL_REGEX, url, re.IGNORECASE):
+        if URL in url:
             vectra_api_clients.append(
-                VectraClient(
+                VectraClientV3(
                     url=url,
                     client_id=_get_password(url, "Client_ID", modify=modify),
                     secret_key=_get_password(url, "Secret_Key", modify=modify),
@@ -2043,23 +2245,21 @@ if __name__ == "__main__":
             )
         else:
             vectra_api_clients.append(
-                VectraClient(
-                    url,
-                    _get_password(url, "Token", modify=modify),
+                VectraClientV2(
+                    url=url,
+                    token=_get_password(url, "Token", modify=modify),
                 )
             )
-
-    logger.debug("Configuring Third Party Clients")
-    third_party_clients = [
-        Third_Party_Client.Client(modify=modify)
-        for Third_Party_Client in Third_Party_Clients
-    ]
 
     processors = []
     logger.debug("Creating individual process for each Vectra API Client")
     for vectra_api_client in vectra_api_clients:
         processors.append(
-            Process(target=main, args=(args, vectra_api_client, third_party_clients))
+            Process(
+                target=main,
+                # args=(args, vectra_api_client, third_party_clients, log_dict_config),
+                args=(args, vectra_api_client, modify, log_dict_config),
+            )
         )
     for p in processors:
         p.start()

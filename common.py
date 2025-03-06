@@ -1,5 +1,8 @@
-import keyring
+import re
+
 import questionary
+
+import keyring
 
 
 def _get_password(system, key, **kwargs):
@@ -16,3 +19,12 @@ def _get_password(system, key, **kwargs):
                 print("Failed to store password")
 
     return password
+
+
+def _format_url(url):
+    if ":/" not in url:
+        url = "https://" + url
+    else:
+        url = re.sub("^.*://?", "https://", url)
+    url = url[:-1] if url.endswith("/") else url
+    return url

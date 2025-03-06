@@ -1,3 +1,3 @@
-BASE_URL = ""
+HOSTNAME = ""
 ORGANIZATION = ""
-VERIFY = False
+CHECK_SSL = False

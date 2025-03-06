@@ -21,6 +21,8 @@ from third_party_clients.xtreme_networks_nbi.xnnbi_config import (
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "XtremeNBI"
+        self.module = "xtreme_networks_nbi"
+        self.init_log(kwargs)
         self.base_url = "https://{}:{}".format(HOSTNAME, PORT)
         self.nbiUrl = self.base_url + "/nbi/graphql"
         self.verify = CHECK_SSL
@@ -28,12 +30,17 @@ class Client(ThirdPartyInterface):
         self.secret = _get_password("XNNBI", "Client_Secret", modify=kwargs["modify"])
         self.timeout = 10
         self.token = None
-        self.logger = logging.getLogger()
         self.expire = 0
         self.renewTime = 90  # in procentage of the max expire time
         self.session = self._login()
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _computeExpireTime(self, TimeStart, TimeEnd):
         """internal use only"""
@@ -156,35 +163,35 @@ class Client(ThirdPartyInterface):
         return mac_addresses
 
     def groom_host(self, host) -> dict:
-        self.logger.warn("This client does not implement host grooming")
+        self.logger.warning("This client does not implement host grooming")
         return []
 
     def block_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn("This client does not implement detection-based blocking")
+        self.logger.warning("This client does not implement detection-based blocking")
         return []
 
     def unblock_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn("This client only implements Host-based blocking")
+        self.logger.warning("This client only implements Host-based blocking")
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("This client only implements Host-based blocking")
+        self.logger.warning("This client only implements Host-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("This client only implements Host-based blocking")
+        self.logger.warning("This client only implements Host-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("This client only implements Host-based blocking")
+        self.logger.warning("This client only implements Host-based blocking")
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("This client only implements Host-based blocking")
+        self.logger.warning("This client only implements Host-based blocking")
         return []

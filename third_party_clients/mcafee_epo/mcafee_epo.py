@@ -1,11 +1,11 @@
-import json
 import logging
 
 import requests
+from common import _get_password
 from third_party_clients.mcafee_epo.mcafee_config import (
-    MCAFEE_HOSTNAME,
-    MCAFEE_PORT,
-    MCAFEE_TAGID,
+    HOSTNAME,
+    PORT,
+    TAGID,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -14,8 +14,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
-from common import _get_password
 
 
 def request_error_handler(func):
@@ -53,28 +51,73 @@ class HTTPException(Exception):
 
 
 class Client:
-    """Communicate with an ePO server.
-    Instances are callable, pass a command name and parameters to make
-    API calls.
-    """
-
     def __init__(self, **kwargs):
-        self.name = "McAfee EPO Client"
         """Create a client for the given ePO server.
 
         :param url: Location of ePO server.
         :param username: Username to authenticate.
         :param password: Password to authenticate.
-        
+
         """
-        self.hostname = MCAFEE_HOSTNAME
-        self.port = MCAFEE_PORT
+        self.name = "McAfee EPO Client"
+        self.module = "mcafee_epo"
+        self.init_log(kwargs)
+        self.hostname = HOSTNAME
+        self.port = PORT
         self.url = f"https://{self.hostname}:{self.port}"
         self.username = _get_password("McAfee", "Username", modify=kwargs["modify"])
         self.password = _get_password("McAfee", "Password", modify=kwargs["modify"])
-        self.tagID = MCAFEE_TAGID
+        self.tagID = TAGID
         self._token = None
-        self.logger = logging.getLogger("McAfee")
+        ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
+        if host.ip != "":
+            self._quarantine_ip_endpoint(host.ip)
+        return host.ip
+
+    def unblock_host(self, host: VectraHost):
+        self._unquarantaine_ip_endpoint(host.ip)
+        return host.ip
+
+    def groom_host(self, host: VectraHost) -> dict:
+        self.logger.warning("McAfee client does not implement host grooming")
+        return []
+
+    def block_account(self, account: VectraAccount) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("McAfee client does not implement account-based blocking")
+        return []
+
+    def unblock_account(self, account: VectraAccount) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("McAfee client does not implement account-based blocking")
+        return []
+
+    def block_detection(self, detection: VectraDetection):
+        # this client only implements Host-based blocking
+        self.logger.warning("McAfee client does not implement detection-based blocking")
+        return []
+    def unblock_detection(self, detection: VectraDetection):
+        self.logger.warning("McAfee client does not implement detection-based blocking")
+        # this client only implements Host-based blocking
+        return []
+
+    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("McAfee client does not implement static IP-based blocking")
+        return []
+
+    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
+        # this client only implements Host-based blocking
+        self.logger.warning("McAfee client does not implement static IP-based blocking")
+        return []
 
     def _get_token(self, _skip=False):
         """Get the security token if it's not already cached.
@@ -139,44 +182,6 @@ class Client:
             params["param{}".format(i)] = item
 
         self._request(command, params=params)
-
-    def block_host(self, host):
-        if host.ip != "":
-            self._quarantine_ip_endpoint(host.ip)
-        return host.ip
-
-    def unblock_host(self, host):
-        self._unquarantaine_ip_endpoint(host.ip)
-        return host.ip
-
-    def groom_host(self, host) -> dict:
-        self.logger.warning("McAfee client does not implement host grooming")
-        return []
-
-    def block_detection(self, detection):
-        # this client only implements Host-based blocking
-        self.logger.warn("McAfee client does not implement detection-based blocking")
-        return []
-
-    def unblock_detection(self, detection):
-        # this client only implements Host-based blocking
-        return []
-
-    def block_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def unblock_account(self, account: VectraAccount) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        return []
-
-    def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
-        # this client only implements Host-based blocking
-        return []
 
     # McAfee ePO Host Isolation
     def _quarantine_ip_endpoint(self, ip_address):

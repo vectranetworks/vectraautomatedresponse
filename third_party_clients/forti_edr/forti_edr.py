@@ -1,7 +1,12 @@
 import logging
-import fortiedr
 
+import fortiedr
 from common import _get_password
+from third_party_clients.forti_edr.forti_edr_config import (
+    CHECK_SSL,
+    HOSTNAME,
+    ORGANIZATION,
+)
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -9,27 +14,23 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-from third_party_clients.forti_edr.forti_edr_config import (
-    BASE_URL,
-    ORGANIZATION,
-    VERIFY,
-)
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "FortiEDR Client"
-        self.logger = logging.getLogger()
-        self.url = BASE_URL
+        self.module = "forti_edr"
+        self.init_log(kwargs)
+        self.hostname = HOSTNAME
         self.org = ORGANIZATION
-        self.verify = VERIFY
+        self.verify = CHECK_SSL
         self.user = _get_password("FortiEDR", "user", modify=kwargs["modify"])
         self.password = _get_password("FortiEDR", "password", modify=kwargs["modify"])
         try:
             auth = fortiedr.auth(
                 user=self.user,
                 passw=self.password,
-                host=self.url,  # use only the hostname, without 'https://'
+                host=self.hostname,  # use only the hostname, without 'https://'
                 org=self.org,  # Add organization IF needed.
             )
             if not auth["status"]:
@@ -40,6 +41,12 @@ class Client(ThirdPartyInterface):
             raise e
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _list_collector(self, host: VectraHost) -> list:
         """
@@ -115,7 +122,7 @@ class Client(ThirdPartyInterface):
                     self.logger.info(f"Unable to un-isolation {log_string}")
             return un_isolated
 
-    def groom_host(self, host) -> list:
+    def groom_host(self, host: VectraHost) -> list:
         self.logger.warning("FortiEDR client does not implement host grooming")
         return []
 
