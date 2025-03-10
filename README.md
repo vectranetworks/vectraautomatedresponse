@@ -21,7 +21,9 @@ Currently, the following third party integrations are implemented:
   1. Cisco Meraki
   1. Cisco PxGrid
   1. ClearPass
+  1. Deep Instinct
   1. Endgame
+  1. Forti EDR
   1. Harmony
   1. McAfee EPO
   1. PAN Cortex
