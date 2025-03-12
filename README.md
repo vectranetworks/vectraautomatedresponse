@@ -40,6 +40,9 @@ Currently, the following third party integrations are implemented:
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
 
+### NAC Appliances
+  1. Extreme Networks NBI
+
 ### System Calls
   1. Call an external program/script
   1. Windows Shutdown (PowerShell command to shutdown host)
