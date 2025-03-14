@@ -11,7 +11,7 @@ SLEEP_MINUTES = 5
 # 'harmony', 'mcafee_epo', 'meraki', 'pan', 'pulse_nac', 'sophos', 'tanium', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'watchguard', 'windows_shutdown', 'withsecure_elements',
 # 'xtreme_networks_nbi']
-THIRD_PARTY_CLIENTS = ["test_client"]
+THIRD_PARTY_CLIENTS = ["vmware"]
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
