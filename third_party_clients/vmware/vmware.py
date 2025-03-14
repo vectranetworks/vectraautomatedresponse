@@ -69,7 +69,10 @@ class Client(ThirdPartyInterface):
             if vm_pointer:
                 self.update_virtual_nic_state(si, host, vm_pointer, "disconnect")
                 break  # break the parent loop as well
-        return [uuid]
+        if vm_pointer:
+            return [uuid]
+        else:
+            return []
 
     def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("VMWare client does not implement host grooming")

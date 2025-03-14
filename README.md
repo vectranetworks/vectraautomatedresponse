@@ -40,6 +40,7 @@ Currently, the following third party integrations are implemented:
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
 
+
 ### NAC Appliances
   1. Extreme Networks NBI
 

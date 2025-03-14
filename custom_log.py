@@ -115,6 +115,10 @@ dict_config = {
             "level": "",
             "handlers": ["null_handler"],
         },
+        "urllib3": {
+            "level": "WARNING",
+            "handlers": ["console"],
+        },
         "VAR": {
             "level": "",
             "handlers": ["console", "file"],
