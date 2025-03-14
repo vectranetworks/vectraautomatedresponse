@@ -1,5 +1,6 @@
 # ClearPass Client
 This client is used to isolate/unisolate hosts' network connectivity utilizing the ClearPass API.  
+Requires RADIUS Accounting to be enabled on physical switches.
 
 # Requirements
 - __Python packages__

@@ -26,6 +26,7 @@ Currently, the following third party integrations are implemented:
   1. Harmony
   1. McAfee EPO
   1. PAN Cortex
+  1. Sophos EDR
   1. Tanium
   1. Trendmicro ApexOne
   1. Trendmicro CloudOne
