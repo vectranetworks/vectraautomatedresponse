@@ -281,7 +281,7 @@ class Client(ThirdPartyInterface):
         self.logger.info(
             "Groom host called.  Host tags: {}".format(host.blocked_elements)
         )
-        meraki_blocked_elements = host.blocked_elements.get("MerakiClient")
+        meraki_blocked_elements = host.blocked_elements.get(self.name)
         if meraki_blocked_elements:
             clients_list = self._get_client_id(
                 host.ip, host.mac_addresses, host.last_seen_ts_utc
@@ -642,7 +642,10 @@ class Client(ThirdPartyInterface):
                         ports.content
                     )
                 )
-        if client.get("ssid") and client.get("recentDeviceConnection") == "WLAN":
+        if client.get("ssid") and client.get("recentDeviceConnection") in [
+            "WLAN",
+            "Wireless",
+        ]:
             return "WLAN", True
         else:
             return "unknown", False

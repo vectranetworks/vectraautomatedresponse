@@ -38,11 +38,11 @@ from config import (
     BLOCK_START_TIME,
     COGNITO_URL,
     DST_EMAIL,
+    EXPLICIT_UNBLOCK,
     EXTERNAL_BLOCK_DETECTION_TAG,
     EXTERNAL_BLOCK_DETECTION_TYPES,
     EXTERNAL_BLOCK_HOST_TC,
-    LOG_FILE,
-    LOG_TO_FILE,
+    EXTERNAL_UNBLOCK_DETECTION_TAG,
     NO_BLOCK_ACCOUNT_GROUP_NAME,
     NO_BLOCK_HOST_GROUP_NAME,
     SEND_EMAIL,
@@ -59,6 +59,8 @@ from config import (
     SYSLOG_PROTO,
     SYSLOG_SERVER,
     THIRD_PARTY_CLIENTS,
+    UNBLOCK_ACCOUNT_TAG,
+    UNBLOCK_HOST_TAG,
 )
 from keyrings.alt import file
 from requests import HTTPError
@@ -573,6 +575,21 @@ class VectraClient:
             **hosts_with_detection_types,
         }
 
+    def get_hosts_to_unblock(
+        self,
+        unblock_tag: Optional[str] = None,
+    ) -> HostDict:
+        """
+        Get all host IDs which should be blocked given the parameters.
+        :param unblock_tag: tag defining hosts that need to be unblocked - optional
+
+        :rtype: HostDict
+        """
+
+        tagged_hosts = self.get_tagged_hosts(tag=unblock_tag) if unblock_tag else {}
+
+        return {**tagged_hosts}
+
     def get_accounts_to_block(
         self,
         block_tag: Optional[str] = None,
@@ -621,6 +638,23 @@ class VectraClient:
             **scored_accounts,
             **group_members,
             **accounts_with_detection_types,
+        }
+
+    def get_accounts_to_unblock(
+        self,
+        unblock_tag: Optional[str] = None,
+    ) -> AccountDict:
+        """
+        Get all account IDs which should be blocked given the parameters
+        :param unblock_tag: tag defining account that need to be unblocked - optional
+        :rtype: AccountDict
+        """
+        tagged_accounts = (
+            self.get_tagged_accounts(tag=unblock_tag) if unblock_tag else {}
+        )
+
+        return {
+            **tagged_accounts,
         }
 
     def get_tagged_detections(self, tag: str) -> DetectionDict:
@@ -824,6 +858,21 @@ class VectraClient:
         )
         return {**tagged_detections, **typed_detections, **detections_of_scored_hosts}
 
+    def get_detections_to_unblock(
+        self,
+        unblock_tag: Optional[str] = None,
+    ) -> DetectionDict:
+        """
+        Get a dict of all detection IDs which should be blocked given the parameters.
+        :param unblock_tag: tag defining detections which should be unblocked or unblocked - optional
+        :rtype: DetectionDict
+        """
+        tagged_detections = (
+            self.get_tagged_detections(tag=unblock_tag) if unblock_tag else {}
+        )
+
+        return {**tagged_detections}
+
 
 class VectraClientV3(ClientV3_latest, VectraClient):
     """
@@ -926,6 +975,10 @@ class VectraAutomatedResponse(object):
         external_block_detection_tag: Optional[str],
         static_dest_ip_block_file: str,
         log_dict_config: dict,
+        explicit_unblock: bool,
+        unblock_host_tag: Optional[str],
+        unblock_account_tag: Optional[str],
+        external_unblock_detection_tag: Optional[str],
     ):
         # Generic setup
         self.third_party_clients = third_party_clients
@@ -962,6 +1015,11 @@ class VectraAutomatedResponse(object):
         self.info_msg = []
         self.warn_msg = []
         self.err_msg = []
+
+        self.explicit_unblock = explicit_unblock
+        self.unblock_host_tag = unblock_host_tag
+        self.unblock_account_tag = unblock_account_tag
+        self.external_unblock_detection_tag = external_unblock_detection_tag
 
     @staticmethod
     def _get_dict_keys_intersect(dict1, dict2):
@@ -1050,9 +1108,16 @@ class VectraAutomatedResponse(object):
             self.logger.info(message)
 
         # Compute hosts that should be unblocked
-        hosts_to_unblock = self._get_dict_keys_relative_complement(
-            blocked_hosts, matching_hosts
-        )
+        if self.explicit_unblock:
+            # Get a dict of hosts to unblock
+            hosts_to_unblock = self.vectra_api_client.get_hosts_to_unblock(
+                unblock_tag=self.unblock_host_tag,
+            )
+        else:
+            hosts_to_unblock = self._get_dict_keys_relative_complement(
+                blocked_hosts, matching_hosts
+            )
+
         # Add wrongly blocked hosts
         hosts_to_unblock = {**hosts_to_unblock, **hosts_wrongly_blocked}
 
@@ -1150,9 +1215,16 @@ class VectraAutomatedResponse(object):
             self.logger.info(message)
 
         # Compute accounts that should be unblocked
-        accounts_to_unblock = self._get_dict_keys_relative_complement(
-            blocked_accounts, matching_accounts
-        )
+        if self.explicit_unblock:
+            # Get a dict of hosts to unblock
+            accounts_to_unblock = self.vectra_api_client.get_accounts_to_unblock(
+                unblock_tag=self.unblock_account_tag,
+            )
+        else:
+            accounts_to_unblock = self._get_dict_keys_relative_complement(
+                blocked_accounts, matching_accounts
+            )
+
         # Add wrongly blocked accounts
         accounts_to_unblock = {**accounts_to_unblock, **accounts_wrongly_blocked}
 
@@ -1225,9 +1297,16 @@ class VectraAutomatedResponse(object):
             self.logger.info(message)
 
         # Compute detections that should be unblocked
-        detections_to_unblock = self._get_dict_keys_relative_complement(
-            blocked_detections, matching_detections
-        )
+        if self.explicit_unblock:
+            # Get a dict of hosts to unblock
+            detections_to_unblock = self.vectra_api_client.get_detections_to_unblock(
+                unblock_tag=self.external_unblock_detection_tag,
+            )
+        else:
+            detections_to_unblock = self._get_dict_keys_relative_complement(
+                blocked_detections, matching_detections
+            )
+
         # Add wrongly blocked detections
         detections_to_unblock = {**detections_to_unblock, **detections_wrongly_blocked}
 
@@ -1940,11 +2019,9 @@ def conf_syslog():
         logger.error("Check Syslog configurations.")
 
 
-# def main(args, vectra_api_client, third_party_clients, log_dict_config):
 def main(args, vectra_api_client, modify, log_dict_config):
     var = VectraAutomatedResponse(
         brain=vectra_api_client.url,
-        # third_party_clients=third_party_clients,
         third_party_clients=[
             Third_Party_Client.Client(modify=modify, dict_config=log_dict_config)
             for Third_Party_Client in Third_Party_Clients
@@ -1969,6 +2046,10 @@ def main(args, vectra_api_client, modify, log_dict_config):
         external_block_detection_tag=EXTERNAL_BLOCK_DETECTION_TAG,
         static_dest_ip_block_file=STATIC_BLOCK_DESTINATION_IPS,
         log_dict_config=log_dict_config,
+        explicit_unblock=EXPLICIT_UNBLOCK,
+        unblock_host_tag=UNBLOCK_HOST_TAG,
+        unblock_account_tag=UNBLOCK_ACCOUNT_TAG,
+        external_unblock_detection_tag=EXTERNAL_UNBLOCK_DETECTION_TAG,
     )
 
     if SEND_SYSLOG:
@@ -2171,9 +2252,12 @@ if __name__ == "__main__":
     log_dict_config = custom_log.dict_config
 
     for loggers in log_dict_config["loggers"]:
-        log_dict_config["loggers"][loggers]["level"] = (
-            "INFO" if not args.debug else "DEBUG"
-        )
+        if loggers == "urllib3":
+            pass
+        else:
+            log_dict_config["loggers"][loggers]["level"] = (
+                "INFO" if not args.debug else "DEBUG"
+            )
 
     logging.config.dictConfig(log_dict_config)
     logger = logging.getLogger("VAR")
@@ -2257,7 +2341,6 @@ if __name__ == "__main__":
         processors.append(
             Process(
                 target=main,
-                # args=(args, vectra_api_client, third_party_clients, log_dict_config),
                 args=(args, vectra_api_client, modify, log_dict_config),
             )
         )
