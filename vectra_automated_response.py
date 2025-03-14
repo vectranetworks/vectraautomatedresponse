@@ -99,7 +99,7 @@ class TypeException(TypeError):
 
 
 clients = {}
-for client in os.listdir("third_party_clients"):
+for client in os.listdir(f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients"):
     if client not in [
         "__init__.py",
         "__pycache__",
@@ -108,9 +108,8 @@ for client in os.listdir("third_party_clients"):
         "third_party_interface.py",
     ]:
         tpc = [
-            x
-            for x in os.listdir(f"third_party_clients/{client}")
-            if not re.search(r"_config|__|READ|\.[D|t]", x)
+            x for x in os.listdir(f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}")
+            if not x.startswith('__') and x.endswith('.py') and not 'config' in x
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]

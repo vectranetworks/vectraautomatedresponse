@@ -1,4 +1,4 @@
-CHECK_SSL = False
+VERIFY_SSL = False
 # Palo Alto tag used to associate with internal dynamic group
 INTERNAL_BLOCK_TAG = "Block_Host"
 # Palo Alto tag used to associate with external dynamic group

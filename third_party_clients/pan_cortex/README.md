@@ -1,4 +1,3 @@
-# PAN Cortex Client
 # Introduction
 
 This third-party client implements automated blocking by integrating with Cortex EDR. The script utilizes the online API of the Cortex platform.
