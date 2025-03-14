@@ -3,8 +3,6 @@
 COGNITO_URL = [
     "",
 ]
-LOG_TO_FILE = False
-LOG_FILE = "var.log"
 SLEEP_MINUTES = 5
 # All brains must use the same API version. Run a different instance of this script for each API version
 
@@ -13,7 +11,7 @@ SLEEP_MINUTES = 5
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
 # 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements',
 # 'xtreme_networks_nbi']
-THIRD_PARTY_CLIENTS = ["vmware"]
+THIRD_PARTY_CLIENTS = ["test_client"]
 
 ### ALLOWED BLOCKING WINDOW
 # Days that automated blocking is allowed
@@ -24,9 +22,13 @@ BLOCK_START_TIME = 0
 # 0-23
 BLOCK_END_TIME = 0
 
+EXPLICIT_UNBLOCK = True
+
 ### INTERNAL IP BLOCKING
-# Tag that will cause a host to be blocked; remove the tag to unblock the host
+# Tag that will cause a host to be blocked; remove the tag to unblock the host if EXPLICIT_UNBLOCK is False
 BLOCK_HOST_TAG = "vectra_host_block"
+# Tag that will cause a host to be unblocked; used with `EXPLICIT_UNBLOCK = True`
+UNBLOCK_HOST_TAG = "vectra_host_unblock"
 # Host group for which member will NEVER be blocked.
 NO_BLOCK_HOST_GROUP_NAME = "NoBlock"
 # Host group for which all members will be blocked
@@ -51,8 +53,10 @@ BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, "and", 100)
 # All external IPs in those detections will then be blocked.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 EXTERNAL_BLOCK_HOST_TC = (100, "and", 100)
-# Tag to block external IPs present in detection; remove the tag to unblock the detection.
+# Tag to block external IPs present in detection; remove the tag to unblock the host if EXPLICIT_UNBLOCK is False
 EXTERNAL_BLOCK_DETECTION_TAG = "block"
+# Tag to unblock external IPs present in detection; used with `EXPLICIT_UNBLOCK = True`
+EXTERNAL_UNBLOCK_DETECTION_TAG = "unblock"
 # Detection types for which we will block all external IPs present on those.
 # E.g. "External Remote Access, Data Smuggler"
 EXTERNAL_BLOCK_DETECTION_TYPES = []
@@ -60,8 +64,10 @@ EXTERNAL_BLOCK_DETECTION_TYPES = []
 STATIC_BLOCK_DESTINATION_IPS = "static_dst_ips_to_block.txt"
 
 ### ACCOUNT BLOCKING
-# Tag that will cause an account to be blocked; remove the tag to unblock the host
+# Tag that will cause an account to be blocked; remove the tag to unblock the host if EXPLICIT_UNBLOCK is False
 BLOCK_ACCOUNT_TAG = "vectra_account_block"
+# Tag that will cause an account to be unblocked; used with `EXPLICIT_UNBLOCK = True`
+UNBLOCK_ACCOUNT_TAG = "vectra_account_unblock"
 # Account group for which member will NEVER be blocked.
 NO_BLOCK_ACCOUNT_GROUP_NAME = "NoBlock"
 # Account group for which all members will be blocked
