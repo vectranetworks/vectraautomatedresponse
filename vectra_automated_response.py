@@ -79,7 +79,7 @@ from vat.vectra import ClientV2_latest
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
 
-version = "3.0.0"
+version = "3.1.0"
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -1668,8 +1668,12 @@ class VectraAutomatedResponse(object):
                     # Block account
                     blocked_elements = third_party_client.block_account(account=account)
                     if len(blocked_elements) > 0:
-                        message = "Blocked account {id}, {name},  on client {client}".format(
-                            id=account_id, name=account.name, client=third_party_client.name
+                        message = (
+                            "Blocked account {id}, {name},  on client {client}".format(
+                                id=account_id,
+                                name=account.name,
+                                client=third_party_client.name,
+                            )
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
@@ -1731,7 +1735,9 @@ class VectraAutomatedResponse(object):
                             self.logger.debug("Unblocked element {}".format(element))
                         self.logger.info(
                             "Unblocked account {id}, {name} on client {client}".format(
-                                id=account_id, name=account.name, client=third_party_client.name
+                                id=account_id,
+                                name=account.name,
+                                client=third_party_client.name,
                             )
                         )
                         # Remove all tags set by this script from the account.
