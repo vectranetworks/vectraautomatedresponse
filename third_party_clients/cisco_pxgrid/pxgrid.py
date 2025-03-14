@@ -7,14 +7,15 @@ import urllib
 
 import requests
 import urllib3
+from common import _get_password
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from third_party_clients.cisco_pxgrid.pxgrid_config import (
-    PXGRID_APPLIANCE_LIST,
-    PXGRID_CA_BUNDLE,
-    PXGRID_CERT,
-    PXGRID_KEY,
-    PXGRID_PORT,
-    PXGRID_VERIFY,
+    APPLIANCE_LIST,
+    CA_BUNDLE,
+    CERT,
+    CHECK_SSL,
+    KEY,
+    PORT,
     QUARANTAINE_POLICY,
 )
 from third_party_clients.third_party_interface import (
@@ -24,8 +25,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
-from common import _get_password
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -67,22 +66,22 @@ class HTTPException(Exception):
 class Config:
     def __init__(self, **kwargs):
         self.__ssl_context = None
-        self.pxgrid_appliance_list = PXGRID_APPLIANCE_LIST
-        self.pxgrid_port = PXGRID_PORT
+        self.pxgrid_appliance_list = APPLIANCE_LIST
+        self.pxgrid_port = PORT
         self.username = _get_password(
             "Cisco_PxGrid", "Username", modify=kwargs["modify"]
         )
         self.password = _get_password(
             "Cisco_PxGrid", "Password", modify=kwargs["modify"]
         )
-        self.clientcert = PXGRID_CERT
-        self.clientkey = PXGRID_KEY
+        self.clientcert = CERT
+        self.clientkey = KEY
         if self.clientkey != "":
             self.clientkey_password = _get_password(
                 "Cisco_PxGrid", "Priv_Key_Pass", modify=kwargs["modify"]
             )
-        self.ca_bundle = PXGRID_CA_BUNDLE
-        self.verify = PXGRID_VERIFY
+        self.ca_bundle = CA_BUNDLE
+        self.verify = CHECK_SSL
         self.quarantine_policy = QUARANTAINE_POLICY
         self.headers = {
             "Accept": "application/json",
@@ -203,7 +202,6 @@ class Client(ThirdPartyInterface):
         return url_param[:-1]
 
     def __init__(self, **kwargs):
-        self.name = "PxGrid Client"
         """
         Initialize Cisco PXGRID client
         :param url: FQDN or IP of PXGRID appliance - required
@@ -211,7 +209,9 @@ class Client(ThirdPartyInterface):
         :param password: Password to authenticate to PXGRID - required
         :param verify: Verify SSL (default: False) - optional
         """
-        self.logger = logging.getLogger("PxGrid")
+        self.name = "PxGrid Client"
+        self.module = "cisco_pxgrid"
+        self.init_log(kwargs)
         self.config = Config(modify=kwargs["modify"])
         self.pxgrid = PxgridControl(config=self.config)
         self.enabled = False
@@ -228,6 +228,12 @@ class Client(ThirdPartyInterface):
 
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     @request_error_handler
     def _request(
@@ -254,7 +260,7 @@ class Client(ThirdPartyInterface):
                 verify=self.config.get_verify(),
             )
 
-    def block_host(self, host):
+    def block_host(self, host: VectraHost):
         if host.mac_addresses != []:
             mac_addresses = set(host.mac_addresses)
             # Check if the current MAC is already known
@@ -278,7 +284,7 @@ class Client(ThirdPartyInterface):
                 macs.append(mac_address)
         return macs
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         macs = []
         mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
@@ -287,16 +293,16 @@ class Client(ThirdPartyInterface):
                 macs.append(mac_address)
         return macs
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("PXGRID client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("PXGRID client does not implement detection-based blocking")
+        self.logger.warning("PXGRID client does not implement detection-based blocking")
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
         return []
 

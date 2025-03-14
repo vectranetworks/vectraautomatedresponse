@@ -1,9 +1,8 @@
 import atexit
-import json
 import logging
 import ssl
-from enum import Enum, auto, unique
 
+from common import _get_password
 from pyVim.connect import Disconnect, SmartConnect
 from pyVmomi import vim, vmodl
 from requests import HTTPError
@@ -16,13 +15,12 @@ from third_party_clients.third_party_interface import (
 )
 from third_party_clients.vmware.vmware_config import HOSTS
 
-from common import _get_password
-
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "VMWare Client"
-        self.logger = logging.getLogger()
+        self.module = "vmware"
+        self.init_log(kwargs)
         context = ssl._create_unverified_context()
         self.vcsa_hosts_service_instances = {}
         for host in HOSTS:
@@ -46,9 +44,15 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         # We use a mix of instance and BIOS UUID
-        uuid = host.vmware_vm_uuid[:36]
+        uuid = host.vmware_vm_uuid
         # As we don't know the VCSA the host is on, we need to loop
         vm_pointer = None
         for vcsa_host, si in self.vcsa_hosts_service_instances.items():
@@ -59,21 +63,24 @@ class Client(ThirdPartyInterface):
             vmList = objView.view
             objView.Destroy()
             for vm in vmList:
-                if vm.summary.config.instanceUuid == uuid:
+                if vm.summary.config.instanceUuid in uuid:
                     vm_pointer = vm
                     break  # Get out of the loop since we found the object
             if vm_pointer:
-                self.update_virtual_nic_state(si, vm_pointer, "disconnect")
+                self.update_virtual_nic_state(si, host, vm_pointer, "disconnect")
                 break  # break the parent loop as well
-        return [uuid]
+        if vm_pointer:
+            return [uuid]
+        else:
+            return []
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("VMWare client does not implement host grooming")
         return []
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         # We use a mix of instance and BIOS UUID. We can use the UUID we have on the host container, not the tag as this in constant.
-        uuid = host.vmware_vm_uuid[:36]
+        uuid = host.vmware_vm_uuid
         # As we don't know the VCSA the host is on, we need to loop
         vm_pointer = None
         for vcsa_host, si in self.vcsa_hosts_service_instances.items():
@@ -84,41 +91,41 @@ class Client(ThirdPartyInterface):
             vmList = objView.view
             objView.Destroy()
             for vm in vmList:
-                if vm.summary.config.instanceUuid == uuid:
+                if vm.summary.config.instanceUuid in uuid:
                     vm_pointer = vm
                     break  # Get out of the loop since we found the object
             if vm_pointer:
-                self.update_virtual_nic_state(si, vm_pointer, "connect")
+                self.update_virtual_nic_state(si, host, vm_pointer, "connect")
                 break  # break the parent loop as well
         return [uuid]
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement detection-based blocking")
+        self.logger.warning("VMWare client does not implement detection-based blocking")
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
         return []
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement account-based blocking")
+        self.logger.warning("VMWare client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement account-based blocking")
+        self.logger.warning("VMWare client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement static IP-based blocking")
+        self.logger.warning("VMWare client does not implement static IP-based blocking")
         return []
 
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement static IP-based blocking")
+        self.logger.warning("VMWare client does not implement static IP-based blocking")
         return []
 
     def wait_for_tasks(self, service_instance, tasks):
@@ -168,13 +175,15 @@ class Client(ThirdPartyInterface):
             if pcfilter:
                 pcfilter.Destroy()
 
-    def update_virtual_nic_state(self, si, vm_obj, new_nic_state):
+    def update_virtual_nic_state(self, si, host, vm_obj, new_nic_state):
         """
         :param si: Service Instance
         :param vm_obj: Virtual Machine Object
         :param new_nic_state: Either Connect, Disconnect or Delete
         :return: True if success
         """
+        state = "disable" if new_nic_state == "disconnect" else "enable"
+        self.logger.debug(f"Attempting to {state} the virtual NICs on {host.name}")
         virtual_nic_devices = []
         for dev in vm_obj.config.hardware.device:
             if isinstance(dev, vim.vm.device.VirtualEthernetCard):
@@ -201,6 +210,7 @@ class Client(ThirdPartyInterface):
                 connectable.startConnected = False
             else:
                 connectable = virtual_nic_device.connectable
+
             virtual_nic_spec.device.connectable = connectable
             dev_changes = []
             dev_changes.append(virtual_nic_spec)

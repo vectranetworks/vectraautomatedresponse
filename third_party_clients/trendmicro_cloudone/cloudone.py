@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from common import _get_password
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -10,16 +11,15 @@ from third_party_clients.third_party_interface import (
 )
 from third_party_clients.trendmicro_cloudone.cloudone_config import (
     BASE_URL,
-    VERIFY,
+    CHECK_SSL,
 )
-
-from common import _get_password
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "CloudOne Client"
-        self.logger = logging.getLogger()
+        self.module = "trendmicro_cloudone"
+        self.init_log(kwargs)
         self.url = BASE_URL + "/api"
         self.api_key = _get_password("CloudOne", "API_Key", modify=kwargs["modify"])
         self.headers = {
@@ -27,9 +27,15 @@ class Client(ThirdPartyInterface):
             "Content-Type": "application/json",
             "Authorization": "ApiKey " + self.api_key,
         }
-        self.verify = VERIFY
+        self.verify = CHECK_SSL
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _search_computer(self, ip):
         """

@@ -1,16 +1,11 @@
-import json
 import logging
-from enum import Enum, auto, unique
 
 import requests
-from requests import HTTPError
+from common import _get_password
 from third_party_clients.clearpass.clearpass_config import (
     CHECK_SSL,
-    HOSTNAME,
+    URL,
 )
-
-# PASSWORD,
-# USERNAME,
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -18,15 +13,17 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
+from urllib3.exceptions import InsecureRequestWarning
 
-from common import _get_password
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "ClearPass Client"
-        self.logger = logging.getLogger()
-        self.url = "https://" + HOSTNAME + "/api"
+        self.module = "clearpass"
+        self.init_log(kwargs)
+        self.url = URL + "/api"
         self.verify = CHECK_SSL
         try:
             url_oauth = "{url}/oauth".format(url=self.url)
@@ -49,11 +46,11 @@ class Client(ThirdPartyInterface):
                 url=url_oauth, json=params_oauth, verify=self.verify
             )
             post_oauth.raise_for_status()
-            self.logger.info("Login to ClearPass successful.")
+            self.logger.debug("Login to ClearPass successful.")
             self.bearer = {
                 "Authorization": "Bearer " + post_oauth.json()["access_token"]
             }
-        except HTTPError as http_err:
+        except requests.HTTPError as http_err:
             self.logger.error("Clearpass connection issue")
             raise http_err
         except Exception as err:
@@ -63,7 +60,13 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         mac_addresses = host.mac_addresses
         if len(mac_addresses) == 0:
             self.logger("No MACs supplied from Detect, searching ClearPass.")
@@ -75,23 +78,23 @@ class Client(ThirdPartyInterface):
 
         return mac_addresses
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         mac_addresses = host.blocked_elements.get(self.name, [])
         for mac_address in mac_addresses:
             self._patch_endpoint(mac_address, isolated=False)
             self._disconnect_session(mac_address)
         return mac_addresses
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("Clear Pass client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
-        self.logger.warn("VMWare client does not implement detection-based blocking")
+        self.logger.warning("VMWare client does not implement detection-based blocking")
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         # this client only implements Host-based blocking
         return []
 

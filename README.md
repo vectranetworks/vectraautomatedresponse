@@ -1,3 +1,5 @@
+# Vectra Automated Response Framework
+
 # Introduction
 
 This is a framework meant to allow for easy integration of any third-party security vendor. 
@@ -11,34 +13,45 @@ Since adding a new third party integration only requires to extend that class, I
 # Third party integrations
 
 Currently, the following third party integrations are implemented:
-1.	Bitdefender
-2.	Call an external program
-3.	Cisco AMP
-4.	Cisco FMC
-5.	Cisco ISE
-6.	Cisco Meraki
-7.	Cisco PxGrid
-8.	ClearPass
-9.	Endgame
-10.	Fortinet Firewalls (FortiOS)
-11.	Harmony
-12.	McAfee EPO
-13.	Palo Alto Network Firewalls (Panorama or not)
-14.	PAN Cortex
-15.	Pulse Secure NAC
-16.	Sophos Firewall
-17.	Static destination IP blocking
-18.	Trendmicro ApexOne
-19.	Trendmicro CloudOne
-20.	Trendmicro VisionOne
-21.	VMWare vSphere
-22.	WatchGuard
-23.	Windows (direct PowerShell commands to shutdown host)
-24.	WithSecure Elements
+
+### Endpoint Detection and Response (EDRs)
+  1. Bitdefender
+  1. Cisco AMP
+  1. Cisco ISE
+  1. Cisco Meraki
+  1. Cisco PxGrid
+  1. ClearPass
+  1. Endgame
+  1. Harmony
+  1. McAfee EPO
+  1. PAN Cortex
+  1. Pulse Secure NAC
+  1. Tanium
+  1. Trendmicro ApexOne
+  1. Trendmicro CloudOne
+  1. Trendmicro VisionOne
+  1. WatchGuard
+  1. WithSecure Elements
+
+### Firewalls
+  1. Fortinet Firewalls (FortiOS)
+  1. CheckPoint
+  1. Cisco FMC
+  1. Palo Alto Network Firewalls (Panorama or not)
+  1. Sophos Firewall
+
+### System Calls
+  1. Call an external program/script
+  1. Windows Shutdown (PowerShell command to shutdown host)
+  1. VMWare vSphere/ESXi
+  1. Static destination IP blocking
+
 
 Integration-specific documentation can be found in the [relevant folders](./third_party_clients/) of the third party integrations. 
 
 # Requirements
+
+Requires Python 3.9+
 
 Install the python module requirements utilizing pip3:
 
@@ -225,3 +238,12 @@ flag to run the script in a continuous loop with the pause time configured in th
 
 Modules may support attempting to re-block a host (re-grooming) if that host's IP has changed since it was originally
 blocked.  To enable re-grooming for supported modules specify the `--groom` flag.
+
+
+
+### Version: `3.0.0`
+### Authors:
+  - Aurelien Hess <ahess@vectra.ai>
+  - Matt Pieklik  <mp@vectra.ai>
+  - Alex Suciu <asuciu@vectra.ai>
+  - Brandon Wyatt <bwyatt@vectra.ai>

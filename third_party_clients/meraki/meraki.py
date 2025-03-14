@@ -1,17 +1,17 @@
 import json
 import logging
 
-import keyring
 import requests
 import urllib3
+from common import _get_password
 from third_party_clients.meraki.meraki_config import (
     BLOCK_GROUP_POLICY,
     BLOCK_INACTIVE_CLIENTS,
     BLOCK_MULTIPLE_IP,
     BLOCK_MULTIPLE_MAC,
+    CHECK_SSL,
     MERAKI_URL,
     PORT_SCHEDULE,
-    VERIFY,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -21,8 +21,6 @@ from third_party_clients.third_party_interface import (
     VectraStaticIP,
 )
 
-from common import _get_password
-
 urllib3.disable_warnings()
 
 
@@ -31,60 +29,20 @@ class HTTPException(Exception):
 
 
 class Client(ThirdPartyInterface):
-    @staticmethod
-    def get_orgs(urlbase, headers, verify, logger) -> list:
-        """
-        Obtains list of organization IDs from Meraki API
-        :return: list of organization IDs
-        """
-        results = requests.get(
-            urlbase + "/organizations", headers=headers, verify=verify
-        )
-        if results.ok:
-            return [org.get("id") for org in results.json()]
-        else:
-            logger.error(
-                "Unable to retrieve organizations for Meraki API.  Error message:{}".format(
-                    results.reason
-                )
-            )
-            return []
-
-    def get_network_devices(self) -> dict:
-        network_inv_list = []
-        for org in self.orgs:
-            r = requests.get(
-                self.urlbase + "/organizations/{}/devices/availabilities".format(org),
-                headers=self.headers,
-                verify=self.verify,
-            )
-            if r.ok:
-                network_inv_list += r.json()
-        self.logger.debug("network_inv_list: {}".format(network_inv_list))
-        if len(network_inv_list) > 0:
-            network_inv_dict = {}
-            for i in network_inv_list:
-                network_inv_dict[i.get("mac")] = {
-                    "name": i.get("name"),
-                    "product_type": i.get("productType"),
-                    "serial": i.get("serial"),
-                }
-            return network_inv_dict
-        else:
-            return {}
-
     def __init__(self, **kwargs):
-        self.name("Meraki Client")
+        self.name = "Meraki Client"
+        self.module = "meraki"
+        self.init_log(kwargs)
         self.urlbase = MERAKI_URL.strip("/")
         self.token = _get_password("Meraki", "API_Key", modify=kwargs["modify"])
         self.headers = {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + self.token,
         }
-        self.logger = logging.getLogger("Meraki")
-        self.verify = VERIFY
+        self.verify = CHECK_SSL
         self.multi_ip = BLOCK_MULTIPLE_IP
         self.multi_mac = BLOCK_MULTIPLE_MAC
+        self.multi_inac = BLOCK_INACTIVE_CLIENTS
         self.orgs = self.get_orgs(self.urlbase, self.headers, self.verify, self.logger)
         self.block_policy = (
             BLOCK_GROUP_POLICY if bool(BLOCK_GROUP_POLICY) else "Blocked"
@@ -94,7 +52,13 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         # if host.ip == '192.168.0.209':
         #     host.mac_addresses = ['30:24:a9:96:b9:b4', 'a4:97:b1:5e:79:1f']
         self.logger.info(
@@ -238,7 +202,7 @@ class Client(ThirdPartyInterface):
                     )
             return blocked_list
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         blocked_elements = host.blocked_elements.get(self.name, [])
         unblocked_elements = []
         for client_network in blocked_elements:
@@ -308,7 +272,7 @@ class Client(ThirdPartyInterface):
                     )
         return unblocked_elements
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         """
         Method to determine if currently blocked client exists based on client id
         :param host: Vectra host object
@@ -317,7 +281,7 @@ class Client(ThirdPartyInterface):
         self.logger.info(
             "Groom host called.  Host tags: {}".format(host.blocked_elements)
         )
-        meraki_blocked_elements = host.blocked_elements.get("MerakiClient")
+        meraki_blocked_elements = host.blocked_elements.get(self.name)
         if meraki_blocked_elements:
             clients_list = self._get_client_id(
                 host.ip, host.mac_addresses, host.last_seen_ts_utc
@@ -340,11 +304,11 @@ class Client(ThirdPartyInterface):
             # No Meraki blocked elements
             return {"block": False, "unblock": False}
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         self.logger.warning("Meraki client does not implement detection-based blocking")
         return []
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         self.logger.warning("Meraki client does not implement detection-based blocking")
         return []
 
@@ -363,6 +327,48 @@ class Client(ThirdPartyInterface):
     def unblock_static_dst_ips(self, ips: VectraStaticIP) -> list:
         self.logger.warning("Meraki client does not implement static IP-based blocking")
         return []
+
+    @staticmethod
+    def get_orgs(urlbase, headers, verify, logger) -> list:
+        """
+        Obtains list of organization IDs from Meraki API
+        :return: list of organization IDs
+        """
+        results = requests.get(
+            urlbase + "/organizations", headers=headers, verify=verify
+        )
+        if results.ok:
+            return [org.get("id") for org in results.json()]
+        else:
+            logger.error(
+                "Unable to retrieve organizations for Meraki API.  Error message:{}".format(
+                    results.reason
+                )
+            )
+            return []
+
+    def get_network_devices(self) -> dict:
+        network_inv_list = []
+        for org in self.orgs:
+            r = requests.get(
+                self.urlbase + "/organizations/{}/devices/availabilities".format(org),
+                headers=self.headers,
+                verify=self.verify,
+            )
+            if r.ok:
+                network_inv_list += r.json()
+        self.logger.debug("network_inv_list: {}".format(network_inv_list))
+        if len(network_inv_list) > 0:
+            network_inv_dict = {}
+            for i in network_inv_list:
+                network_inv_dict[i.get("mac")] = {
+                    "name": i.get("name"),
+                    "product_type": i.get("productType"),
+                    "serial": i.get("serial"),
+                }
+            return network_inv_dict
+        else:
+            return {}
 
     def _get_networks(self):
         """
@@ -636,7 +642,10 @@ class Client(ThirdPartyInterface):
                         ports.content
                     )
                 )
-        if client.get("ssid") and client.get("recentDeviceConnection") == "WLAN":
+        if client.get("ssid") and client.get("recentDeviceConnection") in [
+            "WLAN",
+            "Wireless",
+        ]:
             return "WLAN", True
         else:
             return "unknown", False

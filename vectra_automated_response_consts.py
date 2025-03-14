@@ -109,7 +109,10 @@ class VectraHost:
     def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Host Blocked"]:
+            if not tag.startswith("VAR ID:") and tag not in [
+                "VAR Host Blocked",
+                "vectra_host_unblock",
+            ]:
                 tags_to_keep.append(tag)
         return tags_to_keep
 
@@ -182,7 +185,10 @@ class VectraAccount:
     def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Account Blocked"]:
+            if not tag.startswith("VAR ID:") and tag not in [
+                "VAR Account Blocked",
+                "vectra_account_unblock",
+            ]:
                 tags_to_keep.append(tag)
         return tags_to_keep
 
@@ -261,6 +267,9 @@ class VectraDetection:
     def _get_external_tags(tags):
         tags_to_keep = []
         for tag in tags:
-            if not tag.startswith("VAR ID:") and tag not in ["VAR Detection Blocked"]:
+            if not tag.startswith("VAR ID:") and tag not in [
+                "VAR Detection Blocked",
+                "vectra_detection_unblock",
+            ]:
                 tags_to_keep.append(tag)
         return tags_to_keep

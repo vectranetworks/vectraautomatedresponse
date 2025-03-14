@@ -1,17 +1,15 @@
-import json
 import logging
 from enum import Enum, auto, unique
 
 import requests
 from common import _get_password
-from requests import HTTPError
 from third_party_clients.fortinet.fortinet_config import (
+    CHECK_SSL,
     EXTERNAL_ADDRESS_GROUP,
     INTERNAL_ADDRESS_GROUP,
     IP,
     PORT,
     VDOM,
-    VERIFY,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -144,18 +142,19 @@ class FortiGate:
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "Fortinet Client"
-        self.logger = logging.getLogger()
+        self.module = "fortinet"
+        self.init_log(kwargs)
         self.internal_block_policy_name = INTERNAL_ADDRESS_GROUP
         self.external_block_policy_name = EXTERNAL_ADDRESS_GROUP
-        if len(IP) == len(PORT) == len(VDOM) == len(VERIFY):
-            firewalls = zip(IP, PORT, VDOM)
+        if len(IP) == len(PORT) == len(VDOM) == len(CHECK_SSL):
+            firewalls = zip(IP, PORT, VDOM, CHECK_SSL)
         else:
             self.logger.error(
                 f"Missing inputs for firewall configuration. Check fortinet_config.py \
                     IP length is {len(IP)}, \
                     PORT length is {len(PORT)}, \
                     VDOM length is {len(VDOM)}, \
-                    VERIFY length is {len(VERIFY)}."
+                    CHECK_SSL length is {len(CHECK_SSL)}."
             )
         try:
             self.firewalls = []
@@ -177,7 +176,13 @@ class Client(ThirdPartyInterface):
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
-    def block_host(self, host):
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
+
+    def block_host(self, host: VectraHost):
         ip_address = host.ip
         for firewall in self.firewalls:
             try:
@@ -188,12 +193,12 @@ class Client(ThirdPartyInterface):
                     block_type=BlockType.SOURCE,
                     append=True,
                 )
-            except HTTPError as e:
+            except requests.HTTPError as e:
                 self.logger.error("Unable to block IP: {}.  Continuing".format(e))
                 continue
         return [ip_address]
 
-    def unblock_host(self, host):
+    def unblock_host(self, host: VectraHost):
         ip_addresses = host.blocked_elements.get(self.name, [])
         self.logger.debug("ip_address:{}".format(ip_addresses))
         if len(ip_addresses) < 1:
@@ -208,16 +213,16 @@ class Client(ThirdPartyInterface):
                         append=False,
                     )
                     self.unregister_address(firewall, ip_address)
-                except HTTPError as e:
+                except requests.HTTPError as e:
                     self.logger.error("Unable to unblock IP: {}.  Continuing".format(e))
                     continue
         return ip_addresses
 
-    def groom_host(self, host) -> dict:
+    def groom_host(self, host: VectraHost) -> dict:
         self.logger.warning("Fortinet client does not implement host grooming")
         return []
 
-    def block_detection(self, detection):
+    def block_detection(self, detection: VectraDetection):
         ip_addresses = detection.dst_ips
         for firewall in self.firewalls:
             for ip in ip_addresses:
@@ -229,12 +234,12 @@ class Client(ThirdPartyInterface):
                         block_type=BlockType.DESTINATION,
                         append=True,
                     )
-                except HTTPError as e:
+                except requests.HTTPError as e:
                     self.logger.error("Unable to block IP: {}.  Continuing".format(e))
                     continue
         return ip_addresses
 
-    def unblock_detection(self, detection):
+    def unblock_detection(self, detection: VectraDetection):
         ip_addresses = detection.blocked_elements.get(self.name, [])
         if len(ip_addresses) < 1:
             self.logger.error(
@@ -250,17 +255,17 @@ class Client(ThirdPartyInterface):
                         append=False,
                     )
                     self.unregister_address(firewall, ip_address)
-                except HTTPError as e:
+                except requests.HTTPError as e:
                     self.logger.error("Unable to unblock IP: {}.  Continuing".format(e))
                     continue
         return ip_addresses
 
     def block_account(self, account: VectraAccount) -> list:
-        # Fortinet does not block account
+        self.logger.warning("Fortinet client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
-        # Fortinet does not block account
+        self.logger.warning("Fortinet client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:
@@ -275,7 +280,7 @@ class Client(ThirdPartyInterface):
                         block_type=BlockType.DESTINATION,
                         append=True,
                     )
-            except HTTPError as e:
+            except requests.HTTPError as e:
                 self.logger.error("Unable to unblock IP: {}.  Continuing".format(e))
                 continue
         return ip_addresses
@@ -294,7 +299,7 @@ class Client(ThirdPartyInterface):
                         append=False,
                     )
                     self.unregister_address(firewall, ip_address)
-                except HTTPError as e:
+                except requests.HTTPError as e:
                     self.logger.error("Unable to unblock IP: {}.  Continuing".format(e))
                     continue
         return ip_addresses
@@ -307,7 +312,7 @@ class Client(ThirdPartyInterface):
                 "Address {} unregistered with FortiGate".format(ip_address)
             )
         else:
-            raise HTTPError(ip_address, "Error deleting address")
+            raise requests.HTTPError(ip_address, "Error deleting address")
 
     def register_address(self, firewall, ip_address: str):
         """Register IP with FortiGate if not already registered"""
@@ -319,7 +324,7 @@ class Client(ThirdPartyInterface):
                     "Address {} registered with FortiGate".format(ip_address)
                 )
             else:
-                raise HTTPError(ip_address, "Error creating address")
+                raise requests.HTTPError(ip_address, "Error creating address")
 
     def update_fortinet_group(
         self, firewall, ip_address: str, block_type: BlockType, append=True
@@ -333,7 +338,7 @@ class Client(ThirdPartyInterface):
         # get current group
         group = firewall.get_address_group(group_name)
         if group.status_code == 404:
-            raise HTTPError(
+            raise requests.HTTPError(
                 group, "Error retrieving group data for group {}".format(group_name)
             )
         # Parse list of current members
@@ -347,4 +352,4 @@ class Client(ThirdPartyInterface):
                     break
         r = firewall.update_address_group(group_name, member_list)
         if r.status_code == 500:
-            raise HTTPError("Could not update group {}".format(group_name))
+            raise requests.HTTPError("Could not update group {}".format(group_name))

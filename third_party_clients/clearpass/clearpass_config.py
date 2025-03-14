@@ -1,2 +1,2 @@
-HOSTNAME = ""
+URL = ""
 CHECK_SSL = False
