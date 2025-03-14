@@ -1,4 +1,6 @@
 import logging
+import json
+import re
 
 import requests
 from common import _get_password
@@ -73,8 +75,11 @@ class Client(ThirdPartyInterface):
             mac_addresses = self._get_macs(host.ip)
 
         for mac_address in mac_addresses:
-            self._patch_endpoint(mac_address, isolated=True)
-            self._disconnect_session(mac_address)
+            patch_status = self._patch_endpoint(mac_address, isolated=True)
+            disconnect_status = self._disconnect_session(mac_address)
+
+            if patch_status is not None and disconnect_status is not None:
+                return []
 
         return mac_addresses
 
@@ -130,6 +135,35 @@ class Client(ThirdPartyInterface):
         else:
             return mac_list
 
+    def get_sessions(self, mac):
+        querystring = {'filter': json.dumps({"acctstoptime": {"$exists": False}, "mac_address": mac}),
+                       'calculate_count': 'true'}
+
+        mac = re.sub('[.:-]', '', mac).lower()
+        r = requests.get(
+            url=f'{self.url}/session',
+            headers=self.bearer,
+            params=querystring,
+            verify=self.verify
+        )
+
+        response = r.json()
+
+        if response.get('result', {}).get('error', False) == 1:
+            self.logger.error(f"Error fetching sessions for MAC {mac}: {response.get('result').get('message')}")
+            return False
+
+        if response['count'] > 0:
+            sessionid = [(i['id']) for i in response['_embedded']['items'] if not i['acctstoptime']]
+            return sessionid[0]
+
+        elif response['count'] == 0:
+            self.logger.warning("No active sessions found for MAC {mac}. Disconnect not requested.")
+        else:
+            self.logger.warning(f"Active sessions could not be retrieved for MAC {mac}")
+
+        return False
+
     def _patch_endpoint(self, mac_address, isolated=False):
         patch_endpoint_url = "{url}/endpoint/mac-address/{mac_address}".format(
             url=self.url, mac_address=mac_address
@@ -150,12 +184,15 @@ class Client(ThirdPartyInterface):
         """
         Disconnects host session
         """
-        disconnect_url = (
-            "{url}/session-action/disconnect/mac/{mac_address}?async=false".format(
-                url=self.url, mac_address=mac_address
-            )
-        )
-        disconnect = requests.post(
-            url=disconnect_url, headers=self.bearer, verify=self.verify
-        )
+        sessionid = self.get_sessions(mac_address)
+        if not sessionid:
+            return False
+        disconnect_url = f"{self.url}/session/{sessionid}/disconnect"
+
+        payload = {"confirm_disconnect": "1"}
+
+        self.bearer['content-type'] = "application/json"
+
+        disconnect = requests.post(disconnect_url, data=json.dumps(payload), headers=self.bearer, verify=self.verify)
+
         disconnect.raise_for_status()

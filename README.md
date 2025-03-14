@@ -22,10 +22,11 @@ Currently, the following third party integrations are implemented:
   1. Cisco PxGrid
   1. ClearPass
   1. Endgame
+  1. Forti EDR
   1. Harmony
   1. McAfee EPO
   1. PAN Cortex
-  1. Pulse Secure NAC
+  1. Sophos EDR
   1. Tanium
   1. Trendmicro ApexOne
   1. Trendmicro CloudOne
@@ -40,9 +41,9 @@ Currently, the following third party integrations are implemented:
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
 
-
-### NAC Appliances
+### Network Access Controls (NACs)
   1. Extreme Networks NBI
+  1. Pulse Secure NAC
 
 ### System Calls
   1. Call an external program/script
@@ -245,7 +246,7 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
 
 
 
-### Version: `3.0.0`
+### Version: `3.1.0`
 ### Authors:
   - Aurelien Hess <ahess@vectra.ai>
   - Matt Pieklik  <mp@vectra.ai>
