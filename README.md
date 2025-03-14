@@ -41,7 +41,7 @@ Currently, the following third party integrations are implemented:
   1. Sophos Firewall
 
 ### Network Access Controls (NACs)
-  1. Extreme Networks
+  1. Extreme Networks NBI
   1. Pulse Secure NAC
 
 ### System Calls
