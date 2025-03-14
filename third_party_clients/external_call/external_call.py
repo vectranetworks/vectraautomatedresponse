@@ -39,6 +39,7 @@ class Client(ThirdPartyInterface):
             id = uuid.uuid4()
             cmd = HOST_BLOCK_CMD
             cmd.append(host.ip)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return [id]
@@ -58,6 +59,7 @@ class Client(ThirdPartyInterface):
             self.logger.debug(f"Unblocking host {host.id}, {host.name}, {host.ip}")
             cmd = HOST_UNBLOCK_CMD
             cmd.append(host.ip)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return host.blocked_elements.get(self.name, [])
@@ -87,6 +89,7 @@ class Client(ThirdPartyInterface):
                 else account.fake_sam
             )
             cmd.append(account.context)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return [id]
@@ -111,6 +114,7 @@ class Client(ThirdPartyInterface):
                 else account.fake_sam
             )
             cmd.append(account.context)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return account.blocked_elements.get(self.name, [])
@@ -131,6 +135,7 @@ class Client(ThirdPartyInterface):
             id = uuid.uuid4()
             cmd = DETECTION_BLOCK_CMD
             cmd.append(detection.dst_ips)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return [id]
@@ -150,6 +155,7 @@ class Client(ThirdPartyInterface):
             self.logger.debug(f"Unblocking detection {detection.id}")
             cmd = DETECTION_UNBLOCK_CMD
             cmd.append(detection.dst_ips)
+            self.logger.debug(f"Executing command: {cmd}")
             r = subprocess.run(cmd)
             if r.returncode == 0:
                 return detection.blocked_elements.get(self.name, [])

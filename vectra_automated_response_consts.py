@@ -121,7 +121,7 @@ class VectraAccount:
     def __init__(self, account):
         self._raw = account
         self.id = account["id"]
-        self.names = account["name"]
+        self.name = account["name"]
         self.display_name = (
             account["display_name"] if account.get("display_name") else account["name"]
         )

@@ -22,10 +22,10 @@ Currently, the following third party integrations are implemented:
   1. Cisco PxGrid
   1. ClearPass
   1. Endgame
+  1. Forti EDR
   1. Harmony
   1. McAfee EPO
   1. PAN Cortex
-  1. Pulse Secure NAC
   1. Tanium
   1. Trendmicro ApexOne
   1. Trendmicro CloudOne
@@ -39,6 +39,10 @@ Currently, the following third party integrations are implemented:
   1. Cisco FMC
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
+
+### Network Access Controls (NACs)
+  1. Extreme Networks
+  1. Pulse Secure NAC
 
 ### System Calls
   1. Call an external program/script
