@@ -7,12 +7,12 @@ This client is used to isolate/unisolate hosts' network connectivity utilizing t
 
 # Configuration
 This client uses the configuration file [deepinstinct_edr_config.py](deepinstinct_edr_config.py). 
-  - `HOSTNAME`: Hostname for the DeepInstinct instance
+  - `BASE_URL`: FQDN/URI for the DeepInstinct instance
   - `CHECK_SSL`: Whether or not to validate server TLS certificates (default: False)
   
 # Example Config
 ```
-HOSTNAME = "MYTENNANT.customers.deepinstinctweb.com"
+BASE_URL = "MYTENNANT.customers.deepinstinctweb.com"
 CHECK_SSL = False
 ```
 
