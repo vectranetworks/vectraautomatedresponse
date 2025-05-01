@@ -37,6 +37,7 @@ Currently, the following third party integrations are implemented:
 ### Firewalls
   1. Fortinet Firewalls (FortiOS)
   1. CheckPoint
+  1. Cisco ASA HTTP Interface
   1. Cisco FMC
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
