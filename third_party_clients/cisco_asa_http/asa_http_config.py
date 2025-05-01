@@ -1,0 +1,3 @@
+URL = ""
+BLOCK_GROUP = ""
+USER_AGENT = ""
