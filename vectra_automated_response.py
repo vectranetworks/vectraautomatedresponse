@@ -873,7 +873,6 @@ class VectraClient:
 
         return {**tagged_detections}
 
-
 class VectraClientV3(ClientV3_latest, VectraClient):
     """
     Initialize Vectra client V3
@@ -889,6 +888,71 @@ class VectraClientV3(ClientV3_latest, VectraClient):
         client_id: Optional[str] = "",
         secret_key: Optional[str] = "",
         store: bool = False,
+        verify: bool = False,
+    ) -> None:
+        self.store = store
+        super().__init__(
+            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+        )
+
+    def _check_token(self):
+        if self.store:
+            rux_tokens = self._get_rux_tokens()
+            if rux_tokens:
+                self._access = rux_tokens.get("_access", None)
+                self._accessTime = rux_tokens.get("_accessTime", None)
+                self._refresh = rux_tokens.get("_refresh", None)
+                self._refreshTime = rux_tokens.get("_refreshTime", None)
+            if not self._access:
+                self._get_token()
+                self._set_rux_tokens()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
+                self._set_rux_tokens()
+        else:
+            if not self._access:
+                self._get_token()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
+
+    def _get_rux_tokens(self):
+        rux_tokens = keyring.get_password(self.base_url, "rux_tokens")
+        if rux_tokens:
+            rux_tokens = json.loads(rux_tokens)
+            if rux_tokens.get("_accessTime", 0) > round(time.time()):
+                return rux_tokens
+            else:
+                pass
+        return {}
+
+    def _set_rux_tokens(self):
+        keyring.set_password(
+            self.base_url,
+            "rux_tokens",
+            json.dumps(
+                {
+                    "_access": self._access,
+                    "_refresh": self._refresh,
+                    "_accessTime": self._accessTime,
+                    "_refreshTime": self._refreshTime,
+                }
+            ),
+        )
+
+
+class VectraClientV2(ClientV2_latest, VectraClient):
+    """
+    Initialize Vectra client V2
+    :param url: IP or hostname of Vectra brain - required
+    :param token: V2 API token for authentication - required
+    :param verify: verify SSL - optional
+    """
+
+    def __init__(
+        self,
+        url: Optional[str] = "",
+        client_id: Optional[str] = "",
+        secret_key: Optional[str] = "",
         verify: bool = False,
     ) -> None:
         self.store = store
@@ -2266,7 +2330,6 @@ if __name__ == "__main__":
 
     args = obtain_args()
     log_dict_config = custom_log.dict_config
-
     for loggers in log_dict_config["loggers"]:
         if loggers == "urllib3":
             pass
@@ -2274,7 +2337,6 @@ if __name__ == "__main__":
             log_dict_config["loggers"][loggers]["level"] = (
                 "INFO" if not args.debug else "DEBUG"
             )
-
     logging.config.dictConfig(log_dict_config)
     logger = logging.getLogger("VAR")
 
