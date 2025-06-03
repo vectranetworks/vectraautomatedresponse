@@ -6,7 +6,7 @@ import keyring
 
 
 def _get_password(system, key, **kwargs):
-    env_value = os.environ.get("VECTRA_" + key)
+    env_value = os.environ.get(f"{system}_{key}")
     if env_value is not None:
         return env_value
     store_keys = kwargs["modify"][0]

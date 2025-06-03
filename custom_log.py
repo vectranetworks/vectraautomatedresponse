@@ -4,7 +4,9 @@ import socket
 
 SECRETS = [r"password", r"secret", r"token"]
 MASKED = True
-FILENAME = "var.log"
+if not os.path.exists(f"{os.getcwd()}/logs"):
+    os.makedirs(f"{os.getcwd()}/logs")
+FILENAME = "./logs/var.log"
 TCP = False
 
 
