@@ -250,7 +250,9 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
 
 
 
+
 ### Version: `3.2.0`
+
 ### Authors:
   - Aurelien Hess <ahess@vectra.ai>
   - Matt Pieklik  <mp@vectra.ai>
