@@ -2267,12 +2267,17 @@ if __name__ == "__main__":
     args = obtain_args()
     log_dict_config = custom_log.dict_config
 
+    if args.debug or os.environ.get("VAR_DEBUG"):
+        DEBUG = True
+    else:
+        DEBUG = False
+
     for loggers in log_dict_config["loggers"]:
         if loggers == "urllib3":
             pass
         else:
             log_dict_config["loggers"][loggers]["level"] = (
-                "INFO" if not args.debug else "DEBUG"
+                "INFO" if not DEBUG else "DEBUG"
             )
 
     logging.config.dictConfig(log_dict_config)
