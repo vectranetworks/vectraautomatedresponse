@@ -6,17 +6,19 @@ import keyring
 
 
 def _get_password(system, key, **kwargs):
-    env_value = os.environ.get("VECTRA_" + key)
+    env_value = os.environ.get(f"{system}_{key}")
     if env_value is not None:
         return env_value
     store_keys = kwargs["modify"][0]
     update_keys = kwargs["modify"][1]
-    password = keyring.get_password(system, key)
-    if update_keys:
+    if not store_keys:
         password = getpass.getpass(f"Enter the {system} {key}: ")
-    elif password is None or password == "":
-        password = getpass.getpass(f"Enter the {system} {key}: ")
-    if store_keys:
+    else:
+        password = keyring.get_password(system, key)
+        if update_keys:
+            password = getpass.getpass(f"Enter the {system} {key}: ")
+        elif password is None or password == "":
+            password = getpass.getpass(f"Enter the {system} {key}: ")
         if password is not None:
             try:
                 keyring.set_password(system, key, password)

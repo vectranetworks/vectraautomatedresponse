@@ -18,6 +18,7 @@ from multiprocessing import Process
 from typing import Dict, Optional
 
 import custom_log
+import keyring
 import requests
 from common import _get_password
 from config import (
@@ -65,6 +66,8 @@ from config import (
 from keyrings.alt import file
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from vat.platform import ClientV3_latest
+from vat.vectra import ClientV2_latest
 from vectra_automated_response_consts import (
     VectraAccount,
     VectraDetection,
@@ -72,14 +75,7 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-import keyring
-from vat.platform import ClientV3_latest
-from vat.vectra import ClientV2_latest
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-warnings.filterwarnings("ignore", ".*", PendingDeprecationWarning)
-
-version = "3.0.0"
+version = "3.1.0"
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -892,28 +888,36 @@ class VectraClientV3(ClientV3_latest, VectraClient):
         url: Optional[str] = "",
         client_id: Optional[str] = "",
         secret_key: Optional[str] = "",
+        store: bool = False,
         verify: bool = False,
     ) -> None:
+        self.store = store
         super().__init__(
             url=url, client_id=client_id, secret_key=secret_key, verify=verify
         )
 
     def _check_token(self):
-        rux_tokens = self._get_rux_tokens()
-        if rux_tokens:
-            self._access = rux_tokens.get("_access", None)
-            self._accessTime = rux_tokens.get("_accessTime", None)
-            self._refresh = rux_tokens.get("_refresh", None)
-            self._refreshTime = rux_tokens.get("_refreshTime", None)
-        if not self._access:
-            self._get_token()
-            self._set_rux_tokens()
-        elif self._accessTime < int(time.time()):
-            self._refresh_token()
-            self._set_rux_tokens()
+        if self.store:
+            rux_tokens = self._get_rux_tokens()
+            if rux_tokens:
+                self._access = rux_tokens.get("_access", None)
+                self._accessTime = rux_tokens.get("_accessTime", None)
+                self._refresh = rux_tokens.get("_refresh", None)
+                self._refreshTime = rux_tokens.get("_refreshTime", None)
+            if not self._access:
+                self._get_token()
+                self._set_rux_tokens()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
+                self._set_rux_tokens()
+        else:
+            if not self._access:
+                self._get_token()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
 
     def _get_rux_tokens(self):
-        rux_tokens = keyring.get_password(self.url, "rux_tokens")
+        rux_tokens = keyring.get_password(self.base_url, "rux_tokens")
         if rux_tokens:
             rux_tokens = json.loads(rux_tokens)
             if rux_tokens.get("_accessTime", 0) > round(time.time()):
@@ -924,7 +928,7 @@ class VectraClientV3(ClientV3_latest, VectraClient):
 
     def _set_rux_tokens(self):
         keyring.set_password(
-            self.url,
+            self.base_url,
             "rux_tokens",
             json.dumps(
                 {
@@ -1668,8 +1672,12 @@ class VectraAutomatedResponse(object):
                     # Block account
                     blocked_elements = third_party_client.block_account(account=account)
                     if len(blocked_elements) > 0:
-                        message = "Blocked account {id} on client {client}".format(
-                            id=account_id, client=third_party_client.name
+                        message = (
+                            "Blocked account {id}, {name},  on client {client}".format(
+                                id=account_id,
+                                name=account.name,
+                                client=third_party_client.name,
+                            )
                         )
                         self.logger.info(message)
                         self.info_msg.append(message)
@@ -1730,8 +1738,10 @@ class VectraAutomatedResponse(object):
                             blocked_elements[third_party_client.name].remove(element)
                             self.logger.debug("Unblocked element {}".format(element))
                         self.logger.info(
-                            "Unblocked account {id} on client {client}".format(
-                                id=account_id, client=third_party_client.name
+                            "Unblocked account {id}, {name} on client {client}".format(
+                                id=account_id,
+                                name=account.name,
+                                client=third_party_client.name,
                             )
                         )
                         # Remove all tags set by this script from the account.
@@ -2150,6 +2160,8 @@ def main(args, vectra_api_client, modify, log_dict_config):
         test = datetime.now()
 
         while True:
+            if vectra_api_client.version > 2:
+                vectra_api_client._check_token()
             if test.weekday() in block_days:
                 if init and (test - timedelta(hours=24)).weekday() in block_days:
                     if (
@@ -2255,12 +2267,17 @@ if __name__ == "__main__":
     args = obtain_args()
     log_dict_config = custom_log.dict_config
 
+    if args.debug or os.environ.get("VAR_DEBUG"):
+        DEBUG = True
+    else:
+        DEBUG = False
+
     for loggers in log_dict_config["loggers"]:
         if loggers == "urllib3":
             pass
         else:
             log_dict_config["loggers"][loggers]["level"] = (
-                "INFO" if not args.debug else "DEBUG"
+                "INFO" if not DEBUG else "DEBUG"
             )
 
     logging.config.dictConfig(log_dict_config)
@@ -2329,6 +2346,7 @@ if __name__ == "__main__":
                     url=url,
                     client_id=_get_password(url, "Client_ID", modify=modify),
                     secret_key=_get_password(url, "Secret_Key", modify=modify),
+                    store=store,
                 )
             )
         else:

@@ -6,10 +6,10 @@ COGNITO_URL = [
 SLEEP_MINUTES = 5
 # All brains must use the same API version. Run a different instance of this script for each API version
 
-# Available options: ['bitdefender', 'cisco_amp', 'cisco_fmc', 'cisco_ise',
-# 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet', 'forti_edr',
-# 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
-# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'windows_shutdown', 'withsecure_elements',
+# Available options: ['bitdefender', 'checkpoint', 'cisco_amp', 'cisco_asa_http', 'cisco_fmc', 'cisco_ise',
+# 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'forti_edr', q'fortinet',
+# 'harmony', 'mcafee_epo', 'meraki', 'pan', 'pulse_nac', 'sophos', 'tanium', 'test_client', 'trendmicro_apexone',
+# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'watchguard', 'windows_shutdown', 'withsecure_elements',
 # 'xtreme_networks_nbi']
 THIRD_PARTY_CLIENTS = ["test_client"]
 
@@ -22,7 +22,7 @@ BLOCK_START_TIME = 0
 # 0-23
 BLOCK_END_TIME = 0
 
-EXPLICIT_UNBLOCK = True
+EXPLICIT_UNBLOCK = False
 
 ### INTERNAL IP BLOCKING
 # Tag that will cause a host to be blocked; remove the tag to unblock the host if EXPLICIT_UNBLOCK is False
