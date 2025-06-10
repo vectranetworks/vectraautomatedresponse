@@ -30,7 +30,7 @@ CHECK_SSL = False
 To utilize this client within the VAR Framework, add `"sophos_edr"` to the list of `THIRD_PARTY_CLIENTS` in [config.py](../../config.py).
 
 # Validation
-- Untested
+Tested in production environment by Telonic GmbH.
 
 # Resources
 - https://developer.sophos.com/docs/endpoint-v1/1/overview
