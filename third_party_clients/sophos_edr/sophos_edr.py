@@ -103,24 +103,14 @@ class Client(ThirdPartyInterface):
             self.logger.error(
                     f"Error searching for {host.ip}: {result.text}"
             )
-        if len(endpoints) != 1:
+        if len(endpoints) < 1:
             self.logger.error(
-                "Found no endpoints or multiple endpoints with same IP. Aborting!"
+                "Found no endpoints. Aborting!"
             )
             return False
         else:
             endpoint = endpoints[0]
-            if not f"{endpoint.get('hostname', 'NOTFOUND')}".lower().startswith(
-                host.name.lower()
-            ):
-                self.logger.error(
-                    f"Endpoint name {endpoint.get('name').lower()} \
-                        does not match Vectra hostname {host.name.lower()}!"
-                )
-                return False
-            else:
-                self.logger.info("Endpoint name matches Vectra host name")
-                return endpoint
+            return endpoint
 
     def block_host(self, host: VectraHost) -> list:
         endpoint = self._list_endpoint(host)
@@ -136,7 +126,7 @@ class Client(ThirdPartyInterface):
                 }
         isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         try:
-            results = requests.post(isolate_url, headers=self.headers, json_data=body)
+            results = requests.post(isolate_url, headers=self.headers, json=body)
         except Exception as e:
             self.logger.debug(f"SophosEDR isolation failed with status: {e}")
             results = False
@@ -149,7 +139,6 @@ class Client(ThirdPartyInterface):
             return []
 
     def unblock_host(self, host: VectraHost) -> list:
-        return []
         isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         endpoint_ids = host.blocked_elements.get(self.name, [])
         un_isolated = []
@@ -162,7 +151,7 @@ class Client(ThirdPartyInterface):
                         "comment": "Isolating requested by Vectra integration"
                         }
                 try:
-                    results = requests.post(isolate_url, headers=self.headers, json_data=body)
+                    results = requests.post(isolate_url, headers=self.headers, json=body)
                 except Exception as e:
                     self.logger.debug(f"SophosEDR isolation failed with status: {e}")
                     results = False
