@@ -76,6 +76,7 @@ from vectra_automated_response_consts import (
 version = "3.3.0"
 
 
+
 class CustomAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra):
         super().__init__(logger, extra)
