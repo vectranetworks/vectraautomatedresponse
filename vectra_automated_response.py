@@ -5,13 +5,11 @@ import json
 import logging
 import logging.config
 import os
-import re
 import smtplib
 import socket
 import ssl
 import sys
 import time
-import warnings
 from datetime import datetime, timedelta
 from logging.handlers import SysLogHandler
 from multiprocessing import Process
@@ -75,7 +73,7 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-version = "3.1.0"
+version = "3.3.0"
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -98,7 +96,7 @@ class TypeException(TypeError):
 
 clients = {}
 for client in os.listdir(
-    f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients"
+    f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/"
 ):
     if client not in [
         "__init__.py",
@@ -112,7 +110,7 @@ for client in os.listdir(
             for x in os.listdir(
                 f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}"
             )
-            if not x.startswith("__") and x.endswith(".py") and "config" not in x
+            if not x.startswith("__") and x.endswith(".py")  # and "config" not in x
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
