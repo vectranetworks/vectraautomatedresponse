@@ -111,9 +111,7 @@ for client in os.listdir(
             for x in os.listdir(
                 f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}"
             )
-            if not x.startswith("__")
-            and x.endswith(".py")
-            and "_config" not in x
+            if not x.startswith("__") and x.endswith(".py") and "_config" not in x
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]

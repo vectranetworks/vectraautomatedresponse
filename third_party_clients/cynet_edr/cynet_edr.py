@@ -8,6 +8,7 @@ from third_party_clients.cynet_edr.cynet_edr_config import (
     BASE_URL,
     VERIFY,
 )
+
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -15,7 +16,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
