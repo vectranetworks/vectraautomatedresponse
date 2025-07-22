@@ -10,7 +10,7 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-from third_party_clients.ubiquiti.ubiquiti_config import (
+from third_party_clients.watchguard.watchguard_config import (
     CHECK_SSL,
     URL,
 )
@@ -258,4 +258,4 @@ class Client(ThirdPartyInterface):
             method="get",
             suffix=suffix,
         )
-        return response.json()["data"[0]["device_id"]]
+        return response.json()["data"][0]["device_id"]

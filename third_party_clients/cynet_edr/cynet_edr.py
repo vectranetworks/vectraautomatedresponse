@@ -1,9 +1,13 @@
-from datetime import datetime, timedelta
-import logging
 import json
-import requests
+import logging
+from datetime import datetime, timedelta
 
+import requests
 from common import _get_password
+from third_party_clients.cynet_edr.cynet_edr_config import (
+    BASE_URL,
+    VERIFY,
+)
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
     VectraAccount,
@@ -11,62 +15,47 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-from third_party_clients.cynet_edr.cynet_edr_config import (
-    BASE_URL,
-    VERIFY,
-)
 
 
 class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "CynetEdr Client"
-        self.logger = logging.getLogger()
+        self.module = "cynet_edr"
+        self.init_log(kwargs)
         self.url = BASE_URL
         self.headers = {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            }
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
         self.verify = VERIFY
-        self.user = _get_password(
-                "CynetEdr",
-                "user_name",
-                modify=kwargs["modify"]
-                )
-        self.password = _get_password(
-                "CynetEdr",
-                "password",
-                modify=kwargs["modify"]
-                )
-        self.client_id = _get_password(
-                "CynetEdr",
-                "client_id",
-                modify=kwargs["modify"]
-                )
+        self.user = _get_password("CynetEdr", "user_name", modify=kwargs["modify"])
+        self.password = _get_password("CynetEdr", "password", modify=kwargs["modify"])
+        self.client_id = _get_password("CynetEdr", "client_id", modify=kwargs["modify"])
         try:
             url = f"https://{self.url}/api/account/token"
-            data = {
-                "user_name": self.user,
-                "password": self.password
-            }
+            data = {"user_name": self.user, "password": self.password}
             response = requests.post(
-                    url,
-                    headers=self.headers,
-                    json=data,
-                    verify=self.verify
-                    )
+                url, headers=self.headers, json=data, verify=self.verify
+            )
 
             if not response.json().get("access_token", False):
                 raise response.text
             else:
-                self.headers['access_token'] = response.json().get("access_token")
-                self.headers['Accept'] = "application/json"
-                self.headers['client_id'] = self.client_id
+                self.headers["access_token"] = response.json().get("access_token")
+                self.headers["Accept"] = "application/json"
+                self.headers["client_id"] = self.client_id
 
         except Exception as e:
             self.logger.error("CynetEdr connection issue")
             raise e
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
+
+    def init_log(self, kwargs):
+        dict_config = kwargs.get("dict_config", {})
+        dict_config["loggers"].update({self.name: dict_config["loggers"]["VAR"]})
+        logging.config.dictConfig(dict_config)
+        self.logger = logging.getLogger(self.name)
 
     def _list_hosts(self, host: VectraHost) -> list:
         """
@@ -80,24 +69,22 @@ class Client(ThirdPartyInterface):
         search_url = f"https://{self.url}/api/hosts?LastSeen={last_hour}"
         try:
             response = requests.get(
-                    search_url,
-                    headers=self.headers,
-                    verify=self.verify
-                    )
-            entities = response.json().get('Entities', [])
-            cynet_hosts = [x for x in entities if x['LastIp'] == host.ip]
+                search_url, headers=self.headers, verify=self.verify
+            )
+            entities = response.json().get("Entities", [])
+            cynet_hosts = [x for x in entities if x["LastIp"] == host.ip]
         except Exception as e:
             self.logger.error(f"CynetEdr connection issue: {e}")
             raise e
         if len(cynet_hosts) != 1:
-            self.logger.error(
-                "Found 0 or multiple cynet hosts with same IP. Aborting!"
-            )
+            self.logger.error("Found 0 or multiple cynet hosts with same IP. Aborting!")
             return False
         else:
             cynet_host = cynet_hosts[0]
-            if not cynet_host['HostName'].lower().startswith(
-                host.name.lower().split('.')[0]
+            if (
+                not cynet_host["HostName"]
+                .lower()
+                .startswith(host.name.lower().split(".")[0])
             ):
                 self.logger.error(
                     f"Cynet name {cynet_host['HostName']} \
@@ -117,14 +104,11 @@ class Client(ThirdPartyInterface):
         isolate_url = f"https://{self.url}/api/host/remediation/isolate"
 
         self.logger.info(f"Requesting CynetEdr isolation for {log_string}")
-        payload = {'host': cynet_host['HostName']}
+        payload = {"host": cynet_host["HostName"]}
         try:
             results = requests.post(
-                    isolate_url,
-                    data=payload,
-                    headers=self.headers,
-                    verify=self.verify
-                    )
+                isolate_url, data=payload, headers=self.headers, verify=self.verify
+            )
         except Exception as e:
             self.logger.debug(f"CynetEdr isolation failed with status: {e}")
             results = False
@@ -144,21 +128,17 @@ class Client(ThirdPartyInterface):
         if cynet_names:
             for cynet_name in cynet_names:
                 log_string = f"Cynet host ID {cynet_name}"
-                self.logger.info(
-                        f"Requesting CynetEdr un-isolation for {log_string}"
-                        )
-                payload = {'host': cynet_name}
+                self.logger.info(f"Requesting CynetEdr un-isolation for {log_string}")
+                payload = {"host": cynet_name}
                 try:
                     result = requests.post(
-                                un_isolate_url,
-                                data=payload,
-                                headers=self.headers,
-                                verify=self.verify
-                                )
+                        un_isolate_url,
+                        data=payload,
+                        headers=self.headers,
+                        verify=self.verify,
+                    )
                 except Exception as e:
-                    self.logger.debug(
-                            f"CynetEdr un-isolation failed with status: {e}"
-                            )
+                    self.logger.debug(f"CynetEdr un-isolation failed with status: {e}")
                     result = False
 
                 if result:
@@ -188,16 +168,12 @@ class Client(ThirdPartyInterface):
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning(
-                "CynetEdr client does not implement account-based blocking"
-                )
+        self.logger.warning("CynetEdr client does not implement account-based blocking")
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning(
-                "CynetEdr client does not implement account-based blocking"
-                )
+        self.logger.warning("CynetEdr client does not implement account-based blocking")
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:

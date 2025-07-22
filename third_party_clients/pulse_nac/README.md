@@ -12,12 +12,14 @@ This client uses the configuration file [pulse_nac_config.py](pulse_nac_config.p
   - `PULSE_APPLIANCE`: Pulse NAC appliance IP or hostname
   - `CHECK_SSL`: whether or not to validate server certificate (default: False)
   - `RSA_FILE`: User's private RSA keyfile used in token encoding
+  - `RSA_PUB_FILE`: User's public RSA keyfile used in token encoding
 
 # Example Config
 ```
 PULSE_APPLIANCE = ""
 CHECK_SSL = False
 RSA_FILE = ""
+RSA_PUB_FILE = ""
 ```
 
 # Authentication
