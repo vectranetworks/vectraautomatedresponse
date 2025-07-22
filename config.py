@@ -2,8 +2,6 @@
 # Vectra brain API access.
 COGNITO_URL = ['']
 SLEEP_MINUTES = 5
-# All brains must use the same API version. Run a different instance of this script for each API version
-
 # Available options: ['bitdefender', 'checkpoint', 'cisco_amp', 'cisco_asa_http', 'cisco_fmc', 'cisco_ise',
 # 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'forti_edr', q'fortinet',
 # 'harmony', 'mcafee_epo', 'meraki', 'pan', 'pulse_nac', 'sophos', 'tanium', 'test_client', 'trendmicro_apexone',

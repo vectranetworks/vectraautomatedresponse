@@ -123,6 +123,7 @@ class Client(ThirdPartyInterface):
                 return endpoint
 
     def block_host(self, host: VectraHost) -> list:
+      isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         endpoint = self._list_endpoint(host)
         log_string = f"{host.name} with id {endpoint['id']} and IP {host.ip}"
         if not endpoint:
@@ -133,10 +134,9 @@ class Client(ThirdPartyInterface):
                 "enabled": True,
                 "ids": [endpoint['id']],
                 "comment": "Isolating requested by Vectra integration"
-                }
-        isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
+        }
         try:
-            results = requests.post(isolate_url, headers=self.headers, json_data=body)
+            results = requests.post(isolate_url, headers=self.headers, json=body)
         except Exception as e:
             self.logger.debug(f"SophosEDR isolation failed with status: {e}")
             results = False
@@ -149,7 +149,6 @@ class Client(ThirdPartyInterface):
             return []
 
     def unblock_host(self, host: VectraHost) -> list:
-        return []
         isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         endpoint_ids = host.blocked_elements.get(self.name, [])
         un_isolated = []
@@ -159,12 +158,12 @@ class Client(ThirdPartyInterface):
                 body = {
                         "enabled": False,
                         "ids": [endpoint_id],
-                        "comment": "Isolating requested by Vectra integration"
+                        "comment": "Un-isolating requested by Vectra integration"
                         }
                 try:
-                    results = requests.post(isolate_url, headers=self.headers, json_data=body)
+                    results = requests.post(isolate_url, headers=self.headers, json=body)
                 except Exception as e:
-                    self.logger.debug(f"SophosEDR isolation failed with status: {e}")
+                    self.logger.debug(f"SophosEDR un-isolation failed with status: {e}")
                     results = False
 
                 self.logger.info(f"Requesting SophosEDR un-isolation for {log_string}")

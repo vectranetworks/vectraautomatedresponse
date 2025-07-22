@@ -16,6 +16,7 @@ from multiprocessing import Process
 from typing import Dict, Optional
 
 import custom_log
+import keyring
 import requests
 from common import _get_password
 from config import (
@@ -63,6 +64,8 @@ from config import (
 from keyrings.alt import file
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from vat.platform import ClientV3_latest
+from vat.vectra import ClientV2_latest
 from vectra_automated_response_consts import (
     VectraAccount,
     VectraDetection,
@@ -70,11 +73,8 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-import keyring
-from vat.platform import ClientV3_latest
-from vat.vectra import ClientV2_latest
-
 version = "3.3.2"
+
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -2300,6 +2300,7 @@ if __name__ == "__main__":
     log_dict_config = custom_log.dict_config
 
     if args.debug or os.environ.get("VAR_DEBUG"):
+
         DEBUG = True
     else:
         DEBUG = False
