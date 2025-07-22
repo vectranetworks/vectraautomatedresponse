@@ -214,9 +214,7 @@ class Client(ThirdPartyInterface):
                 self.logger.error(f"Failed to isolate host {host.name}/{host.ip}.")
                 return []
             elif resp.json()["status"] == "DONE":
-                self.logger.debug(
-                    f"Successfully unisolated host {host.name}/{host.ip}."
-                )
+                self.logger.debug(f"Successfully isolated host {host.name}/{host.ip}.")
                 return endpoint_id
 
     def _unisolate_endpoint(self, host, endpoint_id):
