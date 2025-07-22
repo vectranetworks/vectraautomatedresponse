@@ -22,6 +22,7 @@ BLOCK_GROUP=""
 - The VAR Framework utilizes the Python Keyring package to maintain secrets. 
 - This client will request the required credentials on first run. 
 - The client requires Cisco FMC username and password with the following permissions:
+  - Permissions: Object Manager > Modify Object Manager
 
 # Enablement
 To utilize this client within the VAR Framework, add `"cisco_fmc"` to the list of `THIRD_PARTY_CLIENTS` in [config.py](../../config.py).

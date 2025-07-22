@@ -4,8 +4,7 @@ COGNITO_URL = ["https://fqdn or ip"]
 LOG_TO_FILE = False
 LOG_FILE = "var.log"
 SLEEP_MINUTES = 5
-# All brains must use the same API version. Run a different instance of this script for each API version
-V3 = False
+
 # Available options: ['bitdefender', 'cisco_amp', 'cisco_fmc', 'cisco_ise',
 # 'cisco_nxos', 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'fortinet',
 # 'harmony', 'meraki', 'pan', 'pulse_nac', 'sophos', 'test_client', 'trendmicro_apexone',
@@ -21,9 +20,15 @@ BLOCK_START_TIME = 0
 # 0-23
 BLOCK_END_TIME = 0
 
+### EXPLICIT UNBLOCKING
+# Use explicit tags to unblock
+EXPLICIT_UNBLOCK = False
+
 ### INTERNAL IP BLOCKING
-# Tag that will cause a host to be blocked; remove the tag to unblock the host
+# Tag that will cause a host to be blocked; remove the tag to unblock the host unless EXPLICIT_UNBLOCK = True
 BLOCK_HOST_TAG = "vectra_host_block"
+# Tag that will explicitly unblock a host; used only with EXPLICIT_UNBLOCK = True
+UNBLOCK_HOST_TAG = "vectra_host_unblock"
 # Host group for which member will NEVER be blocked.
 NO_BLOCK_HOST_GROUP_NAME = "NoBlock"
 # Host group for which all members will be blocked
@@ -48,7 +53,9 @@ BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, "or", 100)
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 EXTERNAL_BLOCK_HOST_TC = (100, "and", 100)
 # Tag to block external IPs present in detection; remove the tag to unblock the detection.
-EXTERNAL_BLOCK_DETECTION_TAG = "block"
+EXTERNAL_BLOCK_DETECTION_TAG = "vectra_detection_block"
+# Tag to explicitly unblock external IPs present in detection; used only with EXPLICIT_UNBLOCK = True
+EXTERNAL_UNBLOCK_DETECTION_TAG = "vectra_detection_unblock"
 # Detection types for which we will block all external IPs present on those.
 # E.g. "External Remote Access, Data Smuggler"
 EXTERNAL_BLOCK_DETECTION_TYPES = []
@@ -56,8 +63,10 @@ EXTERNAL_BLOCK_DETECTION_TYPES = []
 STATIC_BLOCK_DESTINATION_IPS = "static_dst_ips_to_block.txt"
 
 ### ACCOUNT BLOCKING
-# Tag that will cause an account to be blocked; remove the tag to unblock the host
+# Tag that will cause an account to be blocked; remove the tag to unblock the account
 BLOCK_ACCOUNT_TAG = "vectra_account_block"
+# Tag that will explicitly unblock an account; used only with EXPLICIT_UNBLOCK = True
+UNBLOCK_ACCOUNT_TAG = "vectra_account_unblock"
 # Account group for which member will NEVER be blocked.
 NO_BLOCK_ACCOUNT_GROUP_NAME = "NoBlock"
 # Account group for which all members will be blocked

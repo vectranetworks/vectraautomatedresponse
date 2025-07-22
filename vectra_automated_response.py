@@ -73,7 +73,7 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-version = "3.3.0"
+version = "3.3.2"
 
 
 
@@ -111,7 +111,9 @@ for client in os.listdir(
             for x in os.listdir(
                 f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}"
             )
-            if not x.startswith("__") and x.endswith(".py")  # and "config" not in x
+            if not x.startswith("__")
+            and x.endswith(".py")
+            and "_config" not in x
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -892,7 +894,10 @@ class VectraClientV3(ClientV3_latest, VectraClient):
     ) -> None:
         self.store = store
         super().__init__(
-            url=url, client_id=client_id, secret_key=secret_key, verify=verify
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            verify=verify,
         )
 
     def _check_token(self):
@@ -903,6 +908,10 @@ class VectraClientV3(ClientV3_latest, VectraClient):
                 self._accessTime = rux_tokens.get("_accessTime", None)
                 self._refresh = rux_tokens.get("_refresh", None)
                 self._refreshTime = rux_tokens.get("_refreshTime", None)
+                self.headers = {
+                    "Authorization": f"Bearer {self._access}",
+                    "Content-Type": "application/json",
+                }
             if not self._access:
                 self._get_token()
                 self._set_rux_tokens()
@@ -944,17 +953,27 @@ class VectraClientV2(ClientV2_latest, VectraClient):
     """
     Initialize Vectra client V2
     :param url: IP or hostname of Vectra brain - required
-    :param token: V2 API token for authentication - required
+    :param token: V2 API token for authentication - optional; will be ignored if Client ID and Secret Key used
+    :param client_id: V2.5+ API Client ID for authentication - optionalrequired with Secret Key
+    :param secret_key: V2.5+ API Secret Key for authentication - optional; required with Client ID
     :param verify: verify SSL - optional
     """
 
     def __init__(
         self,
         url: Optional[str] = "",
+        client_id: Optional[str] = "",
+        secret_key: Optional[str] = "",
         token: Optional[str] = "",
         verify: bool = False,
     ) -> None:
-        super().__init__(url=url, token=token, verify=verify)
+        super().__init__(
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            token=token,
+            verify=verify,
+        )
 
 
 class VectraAutomatedResponse(object):
@@ -2032,6 +2051,13 @@ def conf_syslog():
         logger.error("Check Syslog configurations.")
 
 
+# def test_vectra_clients(vectra_api_clients):
+#     for client in vectra_api_clients:
+#         print(client._access)
+#         print(client._accessTime)
+#         print(client.headers)
+
+
 def main(args, vectra_api_client, modify, log_dict_config):
     var = VectraAutomatedResponse(
         brain=vectra_api_client.url,
@@ -2254,6 +2280,13 @@ if __name__ == "__main__":
             help="Test Syslog configurations",
         )
 
+        # parser.add_argument(
+        #     "--test_vectra_clients",
+        #     default=False,
+        #     action="store_true",
+        #     help="Test Vectra Client configurations",
+        # )
+
         parser.add_argument(
             "--plaintext",
             default=False,
@@ -2266,7 +2299,8 @@ if __name__ == "__main__":
     args = obtain_args()
     log_dict_config = custom_log.dict_config
 
-    if args.debug or os.environ.get("VAR_DEBUG").lower() == "true":
+    if args.debug or os.environ.get("VAR_DEBUG"):
+
         DEBUG = True
     else:
         DEBUG = False
@@ -2353,6 +2387,10 @@ if __name__ == "__main__":
                     token=_get_password(url, "Token", modify=modify),
                 )
             )
+
+    # if args.test_vectra_clients:
+    #     test_vectra_clients(vectra_api_clients)
+    #     sys.exit()
 
     processors = []
     logger.debug("Creating individual process for each Vectra API Client")
