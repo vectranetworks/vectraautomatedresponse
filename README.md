@@ -44,6 +44,7 @@ Currently, the following third party integrations are implemented:
   1. Cisco FMC
   1. Palo Alto Network Firewalls (Panorama or not)
   1. Sophos Firewall
+  1. FortiManager
 
 ### Network Access Controls (NACs)
   1. Extreme Networks NBI
@@ -60,13 +61,13 @@ Integration-specific documentation can be found in the [relevant folders](./thir
 
 ## Requirements
 
-Requires Python 3.9+
+Requires Python 3.10+
 
 Install the python module requirements utilizing pip3:
 
 `pip3 install -r requirements.txt`  
 
-> Vectra API Tools version 2.4+ is required to support account based groups.
+> Vectra API Tools version 3.4.2_rc1+ is required to support account based groups.
 
 ## Workflow
 
@@ -253,9 +254,11 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
 
 
 
-### Version: `3.2.0`
+### Version: `3.3.2`
+
 ### Authors:
   - Aurelien Hess <ahess@vectra.ai>
   - Matt Pieklik  <mp@vectra.ai>
   - Alex Suciu <asuciu@vectra.ai>
   - Brandon Wyatt <bwyatt@vectra.ai>
+  - Bryan Bradford <bbradford@vectra.ai>

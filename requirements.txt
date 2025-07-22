@@ -34,7 +34,7 @@ setuptools
 six
 stix
 urllib3
-vectra-api-tools
+vectra-api-tools==3.4.2_rc1
 wcwidth
 weakrefmethod
 wheel
