@@ -123,7 +123,7 @@ class Client(ThirdPartyInterface):
                 return endpoint
 
     def block_host(self, host: VectraHost) -> list:
-      isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
+        isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         endpoint = self._list_endpoint(host)
         log_string = f"{host.name} with id {endpoint['id']} and IP {host.ip}"
         if not endpoint:
