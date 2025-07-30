@@ -3,9 +3,9 @@
 COGNITO_URL = ['']
 SLEEP_MINUTES = 5
 # Available options: ['bitdefender', 'checkpoint', 'cisco_amp', 'cisco_asa_http', 'cisco_fmc', 'cisco_ise',
-# 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'forti_edr', q'fortinet',
+# 'cisco_pxgrid', 'clearpass', 'cortex', 'endgame', 'external_call', 'forti_edr', 'fortinet',
 # 'harmony', 'mcafee_epo', 'meraki', 'pan', 'pulse_nac', 'sophos', 'tanium', 'test_client', 'trendmicro_apexone',
-# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'watchguard', 'windows_shutdown', 'withsecure_elements',
+# 'trendmicro_cloudone', 'trendmicro_visionone', 'vmware', 'watchguard', 'windows_killnic', 'windows_shutdown', 'withsecure_elements',
 # 'xtreme_networks_nbi']
 THIRD_PARTY_CLIENTS = ["test_client"]
 
