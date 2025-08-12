@@ -254,7 +254,7 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
 
 
 
-### Version: `3.3.2`
+### Version: `3.3.3`
 
 ### Authors:
   - Aurelien Hess <ahess@vectra.ai>
