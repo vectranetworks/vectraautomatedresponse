@@ -30,3 +30,4 @@ __pycache__
 *.docx
 vectra_keyring.py
 *test*.py
+config.py
