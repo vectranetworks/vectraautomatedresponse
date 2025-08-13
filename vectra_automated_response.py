@@ -75,8 +75,7 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-version = "3.3.2"
-
+version = "3.3.3"
 
 class CustomAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra):
@@ -950,24 +949,23 @@ class VectraClientV3(ClientV3_latest, VectraClient):
 
     def _set_rux_tokens(self):
         try:
-            rux_tokens = (
-                json.dumps(
+            rux_tokens = json.dumps(
                     {
                         "_access": self._access,
                         "_refresh": self._refresh,
                         "_accessTime": self._accessTime,
                         "_refreshTime": self._refreshTime,
                     }
-                ),
-            )
+                )
             # Windows Keyring can only store 1280 characters in the password.
-            if platform.system == "Windows":
+            if platform.system() == "Windows":
+                windows_limit = 1280
                 i = 0
-                while i < int(math.ceil(len(rux_tokens) / 1280)):
+                while i < int(math.ceil(len(rux_tokens) / windows_limit)):
                     keyring.set_password(
                         self.base_url,
                         f"rux_tokens-{i}",
-                        rux_tokens[1280 * i : 1280 * (i + 1)],
+                        rux_tokens[windows_limit * i : windows_limit * (i + 1)],
                     )
                     i += 1
 

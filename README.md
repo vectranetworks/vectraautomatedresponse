@@ -53,6 +53,7 @@ Currently, the following third party integrations are implemented:
 ### System Calls
   1. Call an external program/script
   1. Windows Shutdown (PowerShell command to shutdown host)
+  1. Windows Kill Network Interface (PowerShell command to disable all NICs on a remote Windows host)
   1. VMWare vSphere/ESXi
   1. Static destination IP blocking
 
@@ -254,7 +255,7 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
 
 
 
-### Version: `3.3.2`
+### Version: `3.3.3`
 
 ### Authors:
   - Aurelien Hess <ahess@vectra.ai>
