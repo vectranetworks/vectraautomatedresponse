@@ -1,11 +1,11 @@
 import logging
-import requests
 
+import requests
 from common import _get_password
 from third_party_clients.sophos_edr.sophos_edr_config import (
     AUTH_URL,
-    WHOAMI_URL,
     VERIFY,
+    WHOAMI_URL,
 )
 from third_party_clients.third_party_interface import (
     ThirdPartyInterface,
@@ -24,14 +24,20 @@ class Client(ThirdPartyInterface):
         self.auth_url = AUTH_URL
         self.whoami_url = WHOAMI_URL
         self.verify = VERIFY
-        self.client_id = _get_password("SophosEDR", "client_id", modify=kwargs["modify"])
-        self.client_secret = _get_password("SophosEDR", "client_secret", modify=kwargs["modify"])
+        self.client_id = _get_password(
+            "SophosEDR", "client_id", modify=kwargs["modify"]
+        )
+        self.client_secret = _get_password(
+            "SophosEDR", "client_secret", modify=kwargs["modify"]
+        )
         try:
-            self.token = self.get_bearer_tok(self.client_id, self.client_secret, self.auth_url)
+            self.token = self.get_bearer_tok(
+                self.client_id, self.client_secret, self.auth_url
+            )
             self.headers = {
-                        "Authorization": f"Bearer {self.token}",
-                        "Accept": "application/json"
-                        }
+                "Authorization": f"Bearer {self.token}",
+                "Accept": "application/json",
+            }
             self.get_whoami_data()
         except Exception as e:
             self.logger.error("SophosEDR connection issue")
@@ -57,14 +63,16 @@ class Client(ThirdPartyInterface):
         # Check the response and act accordingly
         if res_code == 200:
             # Send back the access token and headers
-            sophos_access_token = res_data['access_token']
+            sophos_access_token = res_data["access_token"]
             self.logger.debug("Successfully obtained the bearer token")
             return sophos_access_token
         else:
             # Failed to obtain a bearer token
             self.logger.debug("Failed to obtain the bearer token")
-            res_error_code = res_data['errorCode']
-            res_message = "Response Code: {0} Message: {1}".format(res_code, res_data['message'])
+            res_error_code = res_data["errorCode"]
+            res_message = "Response Code: {0} Message: {1}".format(
+                res_code, res_data["message"]
+            )
             return None, res_message, res_error_code
 
     def get_whoami_data(self, whoami_url=WHOAMI_URL):
@@ -79,8 +87,8 @@ class Client(ThirdPartyInterface):
             raise res_exception
         else:
             whoami_data = res_whoami.json()
-            self.headers['X-Tenant-ID'] = whoami_data['id']
-            self.dataRegion = whoami_data.get('apiHosts', {}).get('dataRegion', '')
+            self.headers["X-Tenant-ID"] = whoami_data["id"]
+            self.dataRegion = whoami_data.get("apiHosts", {}).get("dataRegion", "")
             self.logger.debug("Successfully obtained whoami ID")
 
     def _list_endpoint(self, host: VectraHost) -> list:
@@ -90,19 +98,17 @@ class Client(ThirdPartyInterface):
         :return: list of endpoint IDs
         """
         # Search via IP
-        search_endpoint_url = f'{self.dataRegion}/endpoint/v1/endpoints'
+        search_endpoint_url = f"{self.dataRegion}/endpoint/v1/endpoints"
         params = {
-                "ipAddresses": [host.ip]
-                # Should add Last Seen Value
-                }
+            "ipAddresses": [host.ip]
+            # Should add Last Seen Value
+        }
         result = requests.get(search_endpoint_url, headers=self.headers, params=params)
         if result.status_code == 200:
-            endpoints = result.json().get('items', [])
+            endpoints = result.json().get("items", [])
         else:
             endpoints = []
-            self.logger.error(
-                    f"Error searching for {host.ip}: {result.text}"
-            )
+            self.logger.error(f"Error searching for {host.ip}: {result.text}")
         if len(endpoints) != 1:
             self.logger.error(
                 "Found no endpoints or multiple endpoints with same IP. Aborting!"
@@ -123,7 +129,7 @@ class Client(ThirdPartyInterface):
                 return endpoint
 
     def block_host(self, host: VectraHost) -> list:
-      isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
+        isolate_url = f"{self.dataRegion}/endpoint/v1/endpoints/isolation"
         endpoint = self._list_endpoint(host)
         log_string = f"{host.name} with id {endpoint['id']} and IP {host.ip}"
         if not endpoint:
@@ -131,9 +137,9 @@ class Client(ThirdPartyInterface):
 
         self.logger.info(f"Requesting SophosEDR isolation for {log_string}")
         body = {
-                "enabled": True,
-                "ids": [endpoint['id']],
-                "comment": "Isolating requested by Vectra integration"
+            "enabled": True,
+            "ids": [endpoint["id"]],
+            "comment": "Isolating requested by Vectra integration",
         }
         try:
             results = requests.post(isolate_url, headers=self.headers, json=body)
@@ -156,12 +162,14 @@ class Client(ThirdPartyInterface):
             for endpoint_id in endpoint_ids:
                 log_string = f"{host.name} with id {endpoint_id} and IP {host.ip}"
                 body = {
-                        "enabled": False,
-                        "ids": [endpoint_id],
-                        "comment": "Un-isolating requested by Vectra integration"
-                        }
+                    "enabled": False,
+                    "ids": [endpoint_id],
+                    "comment": "Un-isolating requested by Vectra integration",
+                }
                 try:
-                    results = requests.post(isolate_url, headers=self.headers, json=body)
+                    results = requests.post(
+                        isolate_url, headers=self.headers, json=body
+                    )
                 except Exception as e:
                     self.logger.debug(f"SophosEDR un-isolation failed with status: {e}")
                     results = False
@@ -195,12 +203,16 @@ class Client(ThirdPartyInterface):
 
     def block_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning("SophosEDR client does not implement account-based blocking")
+        self.logger.warning(
+            "SophosEDR client does not implement account-based blocking"
+        )
         return []
 
     def unblock_account(self, account: VectraAccount) -> list:
         # this client only implements Host-based blocking
-        self.logger.warning("SophosEDR client does not implement account-based blocking")
+        self.logger.warning(
+            "SophosEDR client does not implement account-based blocking"
+        )
         return []
 
     def block_static_dst_ips(self, ips: VectraStaticIP) -> list:

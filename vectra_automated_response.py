@@ -4,7 +4,9 @@ import ipaddress
 import json
 import logging
 import logging.config
+import math
 import os
+import platform
 import smtplib
 import socket
 import ssl
@@ -76,7 +78,6 @@ from vectra_automated_response_consts import (
 version = "3.3.2"
 
 
-
 class CustomAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra):
         super().__init__(logger, extra)
@@ -111,9 +112,7 @@ for client in os.listdir(
             for x in os.listdir(
                 f"{os.path.dirname(os.path.realpath(__file__))}/third_party_clients/{client}"
             )
-            if not x.startswith("__")
-            and x.endswith(".py")
-            and "_config" not in x
+            if not x.startswith("__") and x.endswith(".py") and "_config" not in x
         ]
         if tpc != []:
             clients[client] = tpc[0].split(".")[0]
@@ -925,8 +924,23 @@ class VectraClientV3(ClientV3_latest, VectraClient):
                 self._refresh_token()
 
     def _get_rux_tokens(self):
-        rux_tokens = keyring.get_password(self.base_url, "rux_tokens")
-        if rux_tokens:
+        if platform.system() == "Windows":
+            i = 0
+            rux_tokens = ""
+            while (
+                next := keyring.get_password(self.base_url, f"rux_tokens-{i}")
+            ) is not None:
+                i += 1
+                rux_tokens += next
+        else:
+            rux_tokens = keyring.get_password(self.base_url, "rux_tokens")
+        # This is assuming that there are a minimum of 4474 saved characters
+        # len(_access) = 1928
+        # len(_refresh) = 2460
+        # len(_accessTime) = 10
+        # len(_refreshTime) = 10
+        # +66 characters for json related strings
+        if rux_tokens and len(rux_tokens) >= 4474:
             rux_tokens = json.loads(rux_tokens)
             if rux_tokens.get("_accessTime", 0) > round(time.time()):
                 return rux_tokens
@@ -935,18 +949,31 @@ class VectraClientV3(ClientV3_latest, VectraClient):
         return {}
 
     def _set_rux_tokens(self):
-        keyring.set_password(
-            self.base_url,
-            "rux_tokens",
-            json.dumps(
-                {
-                    "_access": self._access,
-                    "_refresh": self._refresh,
-                    "_accessTime": self._accessTime,
-                    "_refreshTime": self._refreshTime,
-                }
-            ),
-        )
+        try:
+            rux_tokens = json.dumps(
+                    {
+                        "_access": self._access,
+                        "_refresh": self._refresh,
+                        "_accessTime": self._accessTime,
+                        "_refreshTime": self._refreshTime,
+                    }
+                )
+            # Windows Keyring can only store 1280 characters in the password.
+            if platform.system() == "Windows":
+                windows_limit = 1280
+                i = 0
+                while i < int(math.ceil(len(rux_tokens) / windows_limit)):
+                    keyring.set_password(
+                        self.base_url,
+                        f"rux_tokens-{i}",
+                        rux_tokens[windows_limit * i : windows_limit * (i + 1)],
+                    )
+                    i += 1
+
+            else:
+                keyring.set_password(self.base_url, "rux_tokens", rux_tokens)
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 
 class VectraClientV2(ClientV2_latest, VectraClient):
@@ -2051,13 +2078,6 @@ def conf_syslog():
         logger.error("Check Syslog configurations.")
 
 
-# def test_vectra_clients(vectra_api_clients):
-#     for client in vectra_api_clients:
-#         print(client._access)
-#         print(client._accessTime)
-#         print(client.headers)
-
-
 def main(args, vectra_api_client, modify, log_dict_config):
     var = VectraAutomatedResponse(
         brain=vectra_api_client.url,
@@ -2280,13 +2300,6 @@ if __name__ == "__main__":
             help="Test Syslog configurations",
         )
 
-        # parser.add_argument(
-        #     "--test_vectra_clients",
-        #     default=False,
-        #     action="store_true",
-        #     help="Test Vectra Client configurations",
-        # )
-
         parser.add_argument(
             "--plaintext",
             default=False,
@@ -2300,7 +2313,6 @@ if __name__ == "__main__":
     log_dict_config = custom_log.dict_config
 
     if args.debug or os.environ.get("VAR_DEBUG"):
-
         DEBUG = True
     else:
         DEBUG = False
@@ -2387,10 +2399,6 @@ if __name__ == "__main__":
                     token=_get_password(url, "Token", modify=modify),
                 )
             )
-
-    # if args.test_vectra_clients:
-    #     test_vectra_clients(vectra_api_clients)
-    #     sys.exit()
 
     processors = []
     logger.debug("Creating individual process for each Vectra API Client")

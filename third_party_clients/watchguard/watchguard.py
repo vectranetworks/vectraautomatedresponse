@@ -10,7 +10,6 @@ from third_party_clients.third_party_interface import (
     VectraHost,
     VectraStaticIP,
 )
-
 from third_party_clients.watchguard.watchguard_config import (
     CHECK_SSL,
     URL,
@@ -260,4 +259,3 @@ class Client(ThirdPartyInterface):
             suffix=suffix,
         )
         return response.json()["data"][0]["device_id"]
-

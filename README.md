@@ -50,10 +50,6 @@ Currently, the following third party integrations are implemented:
   1. Extreme Networks NBI
   1. Pulse Secure NAC
 
-### Network Access Controls (NACs)
-  1. Extreme Networks NBI
-  1. Pulse Secure NAC
-
 ### System Calls
   1. Call an external program/script
   1. Windows Shutdown (PowerShell command to shutdown host)
@@ -266,4 +262,3 @@ blocked.  To enable re-grooming for supported modules specify the `--groom` flag
   - Alex Suciu <asuciu@vectra.ai>
   - Brandon Wyatt <bwyatt@vectra.ai>
   - Bryan Bradford <bbradford@vectra.ai>
-
