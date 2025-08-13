@@ -75,8 +75,7 @@ from vectra_automated_response_consts import (
     VectraStaticIP,
 )
 
-version = "3.3.2"
-
+version = "3.3.3"
 
 class CustomAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra):

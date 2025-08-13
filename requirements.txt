@@ -28,6 +28,7 @@ PyJWT
 python-dateutil
 pytz
 pyvmomi
+pywin32
 questionary
 requests
 setuptools
