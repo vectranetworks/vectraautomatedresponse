@@ -1,11 +1,13 @@
 import getpass
-import msvcrt
 import os
 import platform
 import re
 import sys
 
 import keyring
+
+if platform.system() == "Windows":
+    import msvcrt
 
 
 def windows_getpass(prompt="Password: "):
