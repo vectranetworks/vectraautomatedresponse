@@ -28,7 +28,7 @@ PyJWT
 python-dateutil
 pytz
 pyvmomi
-pywin32
+pywin32; sys_platform == "win32"
 questionary
 requests
 setuptools
