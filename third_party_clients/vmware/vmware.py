@@ -53,6 +53,9 @@ class Client(ThirdPartyInterface):
     def block_host(self, host: VectraHost):
         # We use a mix of instance and BIOS UUID
         uuid = host.vmware_vm_uuid
+        # Check it the host has VMWare attributes - Host class has None values else
+        if not uuid:
+            return []
         # As we don't know the VCSA the host is on, we need to loop
         vm_pointer = None
         for vcsa_host, si in self.vcsa_hosts_service_instances.items():
