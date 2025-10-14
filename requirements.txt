@@ -27,8 +27,8 @@ python-graphql-client
 PyJWT
 python-dateutil
 pytz
-pyvmomi
-pywin32
+pyvmomi >= 9.0.0
+pywin32; sys_platform == "win32"
 questionary
 requests
 setuptools
