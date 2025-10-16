@@ -25,7 +25,7 @@ class Client(ThirdPartyInterface):
     def __init__(self, **kwargs):
         self.name = "PAN Client"
         self.module = "pan"
-        self.init_log(**kwargs)
+        self.init_log(kwargs)
         self.firewalls = []
         for url in URLS:
             self.firewalls.append(
@@ -109,19 +109,26 @@ class Client(ThirdPartyInterface):
         return ip_addresses
 
     def _get_api_token(self, pan_url, modify=False):
-        api_token = self._get_password(pan_url, "API_Key", modify=modify)
+        api_token = _get_password(pan_url, "API_Key", modify=modify)
         if not api_token or modify:
             username = _get_password(pan_url, "username", modify=modify)
             password = _get_password(pan_url, "password", modify=modify)
             payload = {"user": username, "password": password}
 
+        self.logger.info(
+            f"Attemmpting connection to PAN endpoint: {pan_url}"
+        )
         r = requests.post(
             url=f"{pan_url}/api/?type=keygen",
             data=payload,
             verify=False,
+            timeout=(10, None)  # Adding 10 secondes connection timeout for unreachable FWs
         )
         response = xmltodict.parse(r.content)
         api_token = response["response"]["result"]["key"]
+        self.logger.info(
+            f"Connection to {pan_url} and API token generation succesful!"
+        )
         keyring.set_password(
             service_name=pan_url, username="API_Key", password=api_token
         )
