@@ -22,6 +22,7 @@ import keyring
 import requests
 from common import _get_password
 from config import (
+    AUTH,
     BLOCK_ACCOUNT_DETECTION_TYPES,
     BLOCK_ACCOUNT_DETECTION_TYPES_MIN_TC_SCORE,
     BLOCK_ACCOUNT_GROUP_NAME,
@@ -2479,16 +2480,15 @@ if __name__ == "__main__":
                         break
                     time.sleep(30)
         else:
-            client_id = _get_password(url, "Client_ID", modify=modify)
-            if client_id != "":
+            if AUTH.lower() == "oauth":
                 client = VectraClientV2(
                     url=url,
-                    client_id=client_id,
+                    client_id = _get_password(url, "Client_ID", modify=modify),
                     secret_key=_get_password(url, "Secret_Key", modify=modify),
                 )
                 vectra_api_clients.append(client)
 
-            else:
+            elif AUTH.lower() == "token":
                 client = VectraClientV2(
                     url=url,
                     token=_get_password(url, "Token", modify=modify),

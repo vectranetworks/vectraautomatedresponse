@@ -46,10 +46,11 @@ def config_main():
                 "Do you have additional Brains? ", default=False
             ).ask()
 
-        if questionary.confirm(
-            "Do you want to log to the file 'var.log'?"
-        ).unsafe_ask():
-            confs["LOG_TO_FILE"] = True
+        # if questionary.confirm(
+        #     "Do you want to log to the file 'var.log'?"
+        # ).unsafe_ask():
+        #     confs["LOG_TO_FILE"] = True
+        
         # Configure Sleep Minutes
         conf = "SLEEP_MINUTES"
         set_value(conf)
@@ -74,23 +75,37 @@ def config_main():
         if clients != []:
             confs[conf] = clients
 
+        conf = "AUTH"
+        if questionary.confirm(
+            "Are you using Vectra API v2.5 or lower?", default=False
+        ).unsafe_ask():
+            choices = ["OAUTH", "TOKEN"]
+            auth = questionary.select(
+                "Select the AUTH mechanism you are using: ", choices=sorted(choices)
+            ).unsafe_ask()
+            confs[conf] = auth
+
         # Configure Block Days, Block Start Time, Block End Time, and Explicit Unblock
-        for val in [
-            "BLOCK_DAYS",
-            "BLOCK_START_TIME",
-            "BLOCK_END_TIME",
-            "EXPLICIT_UNBLOCK",
-        ]:
-            conf = val
-            if conf in confs:
-                if isinstance(confs[conf], list):
-                    arg = questionary.text(
-                        f"Configure {conf} (current: {confs[conf]}): "
-                    ).unsafe_ask()
-                    if arg != "":
-                        confs[conf] = [x.strip() for x in arg.split(",")]
-                else:
-                    set_value(conf)
+        if block := questionary.confirm(
+            "Do you want to set specific timeframes that the VAR can take action?",
+            default=False,
+        ).unsafe_ask():
+            for val in [
+                "BLOCK_DAYS",
+                "BLOCK_START_TIME",
+                "BLOCK_END_TIME",
+                "EXPLICIT_UNBLOCK",
+            ]:
+                conf = val
+                if conf in confs:
+                    if isinstance(confs[conf], list):
+                        arg = questionary.text(
+                            f"Configure {conf} (current: {confs[conf]}): "
+                        ).unsafe_ask()
+                        if arg != "":
+                            confs[conf] = [x.strip() for x in arg.split(",")]
+                    else:
+                        set_value(conf)
 
         if send := questionary.confirm(
             "Do you want to receive email alerts?", default=False
