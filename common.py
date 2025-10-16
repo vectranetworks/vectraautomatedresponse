@@ -6,15 +6,13 @@ import sys
 
 import keyring
 
-if platform.system() == "Windows":
-    import msvcrt
-
 
 def windows_getpass(prompt="Password: "):
     """
     A Windows-safe replacement for getpass.getpass().
     Works around Python 3.13 EOFError issue.
     """
+    import msvcrt
 
     # If stdin isn't a TTY (e.g., piped input), fallback to normal input
     if not sys.stdin.isatty():

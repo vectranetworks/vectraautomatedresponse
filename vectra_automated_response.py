@@ -77,6 +77,7 @@ from vectra_automated_response_consts import (
 
 version = "3.3.3"
 
+
 class CustomAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra):
         super().__init__(logger, extra)
@@ -250,16 +251,16 @@ class VectraClient:
     def get_scored_hosts(self, tc_tuple, urgency_score) -> HostDict:
         """
         Get a dictionary of all hosts above given threat/certainty threshold
-        :param t_score_gte: threat score threshold
-        :param c_score_gte: certainty score threshold
+        :param threat_gte: threat score threshold
+        :param certainty_gte: certainty score threshold
         :param urgency_score: urgency score threshold for V3 only
         :rtype: HostDict
         """
         hosts = {}
         if tc_tuple is not None:
             try:
-                t_score_gte, condition, c_score_gte = tc_tuple
-                if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+                threat_gte, condition, certainty_gte = tc_tuple
+                if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
                     raise ValueError
                 if condition not in ["and", "or"]:
                     raise ValueError
@@ -271,8 +272,8 @@ class VectraClient:
 
             if condition == "and":
                 r = self.get_all_hosts(
-                    t_score_gte=t_score_gte,
-                    c_score_gte=c_score_gte,
+                    threat_gte=threat_gte,
+                    certainty_gte=certainty_gte,
                 )
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
@@ -280,13 +281,13 @@ class VectraClient:
                     for host in page.json().get("results", []):
                         hosts[host["id"]] = VectraHost(host)
             else:
-                r = self.get_all_hosts(t_score_gte=t_score_gte)
+                r = self.get_all_hosts(threat_gte=threat_gte)
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
                         raise HTTPException(page)
                     for host in page.json().get("results", []):
                         hosts[host["id"]] = VectraHost(host)
-                r = self.get_all_hosts(c_score_gte=c_score_gte)
+                r = self.get_all_hosts(certainty_gte=certainty_gte)
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
                         raise HTTPException(page)
@@ -319,16 +320,16 @@ class VectraClient:
     def get_scored_accounts(self, tc_tuple, urgency_score) -> AccountDict:
         """
         Get a dictionary of all accounts above given threat/certainty threshold
-        :param t_score_gte: threat score threshold
-        :param c_score_gte: certainty score threshold
+        :param threat_gte: threat score threshold
+        :param certainty_gte: certainty score threshold
         :param urgency_score: urgency score threshold for V3 only
         :rtype: AccountDict
         """
         accounts = {}
         if tc_tuple is not None:
             try:
-                t_score_gte, condition, c_score_gte = tc_tuple
-                if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+                threat_gte, condition, certainty_gte = tc_tuple
+                if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
                     raise ValueError
                 if condition not in ["and", "or", "AND", "OR"]:
                     raise ValueError
@@ -340,8 +341,8 @@ class VectraClient:
 
             if condition == "and":
                 r = self.get_all_accounts(
-                    t_score_gte=t_score_gte,
-                    c_score_gte=c_score_gte,
+                    threat_gte=threat_gte,
+                    certainty_gte=certainty_gte,
                 )
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
@@ -349,13 +350,13 @@ class VectraClient:
                     for account in page.json().get("results", []):
                         accounts[account["id"]] = VectraAccount(account)
             else:
-                r = self.get_all_accounts(t_score_gte=t_score_gte)
+                r = self.get_all_accounts(threat_gte=threat_gte)
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
                         raise HTTPException(page)
                     for account in page.json().get("results", []):
                         accounts[account["id"]] = VectraAccount(account)
-                r = self.get_all_accounts(c_score_gte=c_score_gte)
+                r = self.get_all_accounts(certainty_gte=certainty_gte)
                 for page in r:
                     if page.status_code not in [200, 201, 204]:
                         raise HTTPException(page)
@@ -429,11 +430,11 @@ class VectraClient:
         hosts = {}
         try:
             (
-                t_score_gte,
+                threat_gte,
                 condition,
-                c_score_gte,
+                certainty_gte,
             ) = block_host_detections_types_min_host_tc
-            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
                 raise ValueError
             if condition not in ["and", "or"]:
                 raise ValueError
@@ -448,10 +449,10 @@ class VectraClient:
             host_id = detection.host_id
             host = self.get_host_by_id(host_id=host_id).json()
             if condition == "and":
-                if host["threat"] > t_score_gte and host["certainty"] > c_score_gte:
+                if host["threat"] > threat_gte and host["certainty"] > certainty_gte:
                     hosts[host["id"]] = VectraHost(host)
             elif condition == "or":
-                if host["threat"] > t_score_gte or host["certainty"] > c_score_gte:
+                if host["threat"] > threat_gte or host["certainty"] > certainty_gte:
                     hosts[host["id"]] = VectraHost(host)
             else:
                 continue
@@ -470,11 +471,11 @@ class VectraClient:
         accounts = {}
         try:
             (
-                t_score_gte,
+                threat_gte,
                 condition,
-                c_score_gte,
+                certainty_gte,
             ) = block_account_detections_types_min_account_tc
-            if not isinstance(t_score_gte, int) and isinstance(c_score_gte, int):
+            if not isinstance(threat_gte, int) and isinstance(certainty_gte, int):
                 raise ValueError
             if condition not in ["and", "or"]:
                 raise ValueError
@@ -490,14 +491,14 @@ class VectraClient:
             account = self.get_account_by_id(account_id=account_id).json()
             if condition == "and":
                 if (
-                    account["threat"] > t_score_gte
-                    and account["certainty"] > c_score_gte
+                    account["threat"] > threat_gte
+                    and account["certainty"] > certainty_gte
                 ):
                     accounts[account["id"]] = VectraAccount(account)
             elif condition == "or":
                 if (
-                    account["threat"] > t_score_gte
-                    or account["certainty"] > c_score_gte
+                    account["threat"] > threat_gte
+                    or account["certainty"] > certainty_gte
                 ):
                     accounts[account["id"]] = VectraAccount(account)
             else:
@@ -781,8 +782,8 @@ class VectraClient:
     ) -> DetectionDict:
         """
         Get a dictionary of all detections present on hosts exceeding the threat/certainty threshold..
-        :param host_t_score_gte: min threat score of hosts to match
-        :param host_c_score_gte: min certainty score of hosts to match
+        :param host_threat_gte: min threat score of hosts to match
+        :param host_certainty_gte: min certainty score of hosts to match
         :rtype: DetectionDict
         """
         detections = {}
@@ -950,13 +951,13 @@ class VectraClientV3(ClientV3_latest, VectraClient):
     def _set_rux_tokens(self):
         try:
             rux_tokens = json.dumps(
-                    {
-                        "_access": self._access,
-                        "_refresh": self._refresh,
-                        "_accessTime": self._accessTime,
-                        "_refreshTime": self._refreshTime,
-                    }
-                )
+                {
+                    "_access": self._access,
+                    "_refresh": self._refresh,
+                    "_accessTime": self._accessTime,
+                    "_refreshTime": self._refreshTime,
+                }
+            )
             # Windows Keyring can only store 1280 characters in the password.
             if platform.system() == "Windows":
                 windows_limit = 1280
@@ -980,7 +981,7 @@ class VectraClientV2(ClientV2_latest, VectraClient):
     Initialize Vectra client V2
     :param url: IP or hostname of Vectra brain - required
     :param token: V2 API token for authentication - optional; will be ignored if Client ID and Secret Key used
-    :param client_id: V2.5+ API Client ID for authentication - optionalrequired with Secret Key
+    :param client_id: V2.5+ API Client ID for authentication - optional; required with Secret Key
     :param secret_key: V2.5+ API Secret Key for authentication - optional; required with Client ID
     :param verify: verify SSL - optional
     """
@@ -991,8 +992,10 @@ class VectraClientV2(ClientV2_latest, VectraClient):
         client_id: Optional[str] = "",
         secret_key: Optional[str] = "",
         token: Optional[str] = "",
+        store: bool = False,
         verify: bool = False,
     ) -> None:
+        self.store = store
         super().__init__(
             url=url,
             client_id=client_id,
@@ -1000,6 +1003,76 @@ class VectraClientV2(ClientV2_latest, VectraClient):
             token=token,
             verify=verify,
         )
+
+    def _check_token(self):
+        if self.store:
+            qux_tokens = self._get_qux_tokens()
+            if qux_tokens:
+                self._access = qux_tokens.get("_access", None)
+                self._accessTime = qux_tokens.get("_accessTime", None)
+                self.headers = {
+                    "Authorization": f"Bearer {self._access}",
+                    "Content-Type": "application/json",
+                }
+            if not self._access:
+                self._get_token()
+                self._set_qux_tokens()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
+                self._set_qux_tokens()
+        else:
+            if not self._access:
+                self._get_token()
+            elif self._accessTime < int(time.time()):
+                self._refresh_token()
+
+    def _get_qux_tokens(self):
+        if platform.system() == "Windows":
+            i = 0
+            qux_tokens = ""
+            while (
+                next := keyring.get_password(self.base_url, f"qux_tokens-{i}")
+            ) is not None:
+                i += 1
+                qux_tokens += next
+        else:
+            qux_tokens = keyring.get_password(self.base_url, "qux_tokens")
+        # This is assuming that there are a minimum of 2004 saved characters
+        # len(_access) = 1928
+        # len(_accessTime) = 10
+        # +66 characters for json related strings
+        if qux_tokens and len(qux_tokens) >= 2004:
+            qux_tokens = json.loads(qux_tokens)
+            if qux_tokens.get("_accessTime", 0) > round(time.time()):
+                return qux_tokens
+            else:
+                pass
+        return {}
+
+    def _set_qux_tokens(self):
+        try:
+            qux_tokens = json.dumps(
+                {
+                    "_access": self._access,
+                    "_accessTime": self._accessTime,
+                }
+            )
+            # Windows Keyring can only store 1280 characters in the password.
+            if platform.system() == "Windows":
+                windows_limit = 1280
+                i = 0
+                while i < int(math.ceil(len(qux_tokens) / windows_limit)):
+                    keyring.set_password(
+                        self.base_url,
+                        f"qux_tokens-{i}",
+                        qux_tokens[windows_limit * i : windows_limit * (i + 1)],
+                    )
+                    i += 1
+
+            else:
+                keyring.set_password(self.base_url, "qux_tokens", qux_tokens)
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 
 class VectraAutomatedResponse(object):
@@ -2380,24 +2453,50 @@ if __name__ == "__main__":
 
     modify = (store, args.update_secrets)
     vectra_api_clients = []
+    success = False
     for url in COGNITO_URL:
         logger.debug(f"Configuring Vectra API Client for {url}")
         if URL in url:
-            vectra_api_clients.append(
-                VectraClientV3(
+            attempt = 0
+            while not success:
+                client = VectraClientV3(
                     url=url,
                     client_id=_get_password(url, "Client_ID", modify=modify),
                     secret_key=_get_password(url, "Secret_Key", modify=modify),
                     store=store,
                 )
-            )
+                try:
+                    client.headers
+                    vectra_api_clients.append(client)
+                    success = True
+                    attempt = 0
+                except KeyError:
+                    attempt += 1
+                    if attempt > 2:
+                        logger.error(
+                            "Unable to create API client for {url}. Please validate credentials."
+                        )
+                        break
+                    time.sleep(30)
         else:
-            vectra_api_clients.append(
-                VectraClientV2(
+            client_id = _get_password(url, "Client_ID", modify=modify)
+            if client_id != "":
+                client = VectraClientV2(
+                    url=url,
+                    client_id=client_id,
+                    secret_key=_get_password(url, "Secret_Key", modify=modify),
+                )
+                vectra_api_clients.append(client)
+
+            else:
+                client = VectraClientV2(
                     url=url,
                     token=_get_password(url, "Token", modify=modify),
                 )
-            )
+                vectra_api_clients.append(client)
+
+    for client in Third_Party_Clients:
+        client.Client(modify=modify, dict_config=custom_log.dict_config)
 
     processors = []
     logger.debug("Creating individual process for each Vectra API Client")
