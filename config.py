@@ -1,7 +1,11 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = ['']
+COGNITO_URL = [""]
 SLEEP_MINUTES = 5
+
+# The AUTH mechanism that you are using: OAUTH or TOKEN. Token is only valid for API v2.5 and lower
+AUTH = "OAUTH"
+
 # All brains must use the same API version. Run a different instance of this script for each API version
 
 # Available options: ['bitdefender', 'checkpoint', 'cisco_amp', 'cisco_asa_http', 'cisco_fmc', 'cisco_ise',
