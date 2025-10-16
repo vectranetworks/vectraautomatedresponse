@@ -303,7 +303,8 @@ class Client(ThirdPartyInterface):
             xml = json.loads(json.dumps(xmltodict.parse(r.text)))
             for session in xml["activeList"]["activeSession"]:
                 try:
-                    if ip_address in session["ipAddresses"]:
+                    session_ips = session.get("ipAddresses", []) or session.get("framed_ip_address", [])
+                    if ip_address in session_ips:
                         mac_address_list.append(session["calling_station_id"])
                 except KeyError:
                     pass

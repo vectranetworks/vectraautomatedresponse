@@ -1,6 +1,7 @@
 ### GENERAL SETUP
 # Vectra brain API access.
 COGNITO_URL = [""]
+
 SLEEP_MINUTES = 5
 
 # The AUTH mechanism that you are using: OAUTH or TOKEN. Token is only valid for API v2.5 and lower
@@ -38,8 +39,8 @@ BLOCK_HOST_GROUP_NAME = "Block"
 # Threshold threat/certainty score for automatically blocking host.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 BLOCK_HOST_THREAT_CERTAINTY = (100, "and", 100)
-# V3 Only - Threshold urgency score for automatically blocking host.
-BLOCK_HOST_URGENCY = 100
+# V3 Only - Threshold urgency score for automatically blocking host. Set to 101 to disable score blocking
+BLOCK_HOST_URGENCY = 101
 # Can't have both BLOCK_HOST_THREAT_CERTAINTY and BLOCK_HOST_URGENCY.
 # If both provided and V3 is True, BLOCK_HOST_URGENCY will be used.
 # To use BLOCK_HOST_THREAT_CERTAINTY set BLOCK_HOST_URGENCY = None
@@ -77,8 +78,8 @@ BLOCK_ACCOUNT_GROUP_NAME = "Block"
 # Threshold threat/certainty score for automatically blocking account.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 BLOCK_ACCOUNT_THREAT_CERTAINTY = (100, "and", 100)
-# V3 Only - Threshold urgency score for automatically blocking account.
-BLOCK_ACCOUNT_URGENCY = 100
+# V3 Only - Threshold urgency score for automatically blocking account. Set to 101 to disable score blocking.
+BLOCK_ACCOUNT_URGENCY = 101
 # Can't have both BLOCK_ACCOUNT_THREAT_CERTAINTY and BLOCK_ACCOUNT_URGENCY.
 # If both provided and V3 is True, BLOCK_ACCOUNT_URGENCY will be used.
 # To use BLOCK_ACCOUNT_THREAT_CERTAINTY set BLOCK_ACCOUNT_URGENCY = None
